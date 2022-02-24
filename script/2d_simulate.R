@@ -194,7 +194,7 @@ simulate_summary <- function(x){
     duration_time <- min(which(I_total == 0))
     duration_time <- ifelse(is.infinite(duration_time), 150, duration_time)
     peak_time <- which(I_total == max(I_total))[1]
-    peak_attack_rate <- datafile_select[datafile_select$t == peak_time, "I_total"]
+    peak_attack_rate <- datafile_select[datafile_select$t == peak_time, "I_total"]/para_pop
     return(c(total_attack_rate, duration_time, peak_time, peak_attack_rate))
   }
 }
