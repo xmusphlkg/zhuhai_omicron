@@ -199,4 +199,4 @@ names(datafile_s1) <- c('ID', 'Gender', 'Age', 'Infections classification',
                         'Cluster of infections', 'Vaccine dose',
                         'Date of positive test', 'Date of infections report',
                         'Date of onset', 'Date of possibly exposed')
-write.xlsx(datafile_s1, file = 'Table S1.xlsx')
+write.xlsx(datafile_s1, file = 'outcome/science/Table S1.xlsx')

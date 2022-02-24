@@ -9,7 +9,7 @@ library(scales)
 
 remove(list = ls())
 load('data/data_case.Rdata')
-load('outcome/para.RData')
+load('outcome/base/para.RData')
 
 extrafont::font_import('./script/fonts', prompt = F)
 extrafont::loadfonts(device = "win")
@@ -175,9 +175,9 @@ df_nto1 <- function(x){
 outcome <- as.data.frame(t(result@U))
 outcome <- lapply(seq(1, ncol(outcome)/12), df_nto1)
 
-save(result, outcome, file = './outcome/science/simu_vac.RData')
+save(result, outcome, file = './outcome/base/simu_vac.RData')
 
-load('./outcome/science/simu_vac.RData')
+load('./outcome/base/simu_vac.RData')
 
 # data modify -------------------------------------------------------------
 
@@ -210,7 +210,7 @@ datafile_summary_outcome <- data.frame(
   Q3 = apply(datafile_summary, 2, quantile, probs = 0.75)
 )
 
-write.csv(datafile_summary_outcome, file = './outcome/science/simulate_vaccine.csv')
+write.csv(datafile_summary_outcome, file = './outcome/base/simulate_vaccine.csv')
 
 # plot --------------------------------------------------------------------
 
@@ -316,10 +316,6 @@ datafile_ci <- outcome %>%
             I_total_vac_q3       = quantile(I_total_vac, 0.75),
             I_total_vac_max      = quantile(I_total_vac, 0.975)
             )
-
-# x <- 3
-
-# write.csv(datafile_ci, file = './outcome/science/simulate_vaccine.csv')
 
 for (x in 1:3) {
   # x <- 1
@@ -447,8 +443,8 @@ result <- run(model)
 outcome <- as.data.frame(t(result@U))
 outcome <- lapply(seq(1, ncol(outcome)/12), df_nto1)
 
-save(result, outcome, file = './outcome/science/simu_unvac.RData')
-load('./outcome/science/simu_unvac.RData')
+save(result, outcome, file = './outcome/base/simu_unvac.RData')
+load('./outcome/base/simu_unvac.RData')
 
 # data modify -------------------------------------------------------------
 
@@ -463,7 +459,7 @@ datafile_summary_outcome <- data.frame(
   Q3 = apply(datafile_summary, 2, quantile, probs = 0.75)
 )
 
-write.csv(datafile_summary_outcome, file = './outcome/science/simulate_unvaccine.csv')
+write.csv(datafile_summary_outcome, file = './outcome/base/simulate_unvaccine.csv')
 
 # plot --------------------------------------------------------------------
 

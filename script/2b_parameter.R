@@ -170,10 +170,10 @@ outcome <- data.frame(
   mutate(mean = shape/rate,
          sd = sqrt(shape)/rate)
 
-write.csv(outcome, paste0('./outcome/share/Figure distribution.csv'),
+write.csv(outcome, paste0('./outcome/base/parameter distribution.csv'),
           quote = F, row.names = F)
 
-save(si, ib, r0, file = './outcome/para.RData')
+save(si, ib, r0, file = './outcome/base/para.RData')
 
 
 # plot --------------------------------------------------------------------

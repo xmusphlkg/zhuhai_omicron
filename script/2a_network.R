@@ -105,11 +105,6 @@ fig_curve <- ggplot(data = datafile_info)+
 
 fig_curve
 
-# 
-# ggsave(filename = '../outcome/science/fig1_curve.pdf',
-#        fig_curve,
-#        width = 5.5, height = 5, device = cairo_pdf, units = 'cm')
-
 
 # Network plot ------------------------------------------------------------
 
@@ -157,9 +152,6 @@ fig_b <- ggraph(fig_net,layout = "kk")+
   labs(title = 'B')
 fig_b
 
-# ggsave(filename = '../outcome/science/fig1_b.pdf',
-#        fig_b,
-#        width = 5.5, height = 6, device = cairo_pdf, units = 'cm')
 
 # contact tracing ---------------------------------------------------------
 
@@ -228,10 +220,6 @@ fig_d <- ggraph(fig_net, "kk")+
          size = 'none')+
   labs(title = 'D')
 
-# ggsave(filename = '../outcome/science/fig1_d1.pdf',
-#        fig_d,
-#        width = 5.5, height = 7, device = cairo_pdf, units = 'cm')
-
 # gannt -------------------------------------------------------------------
 
 datafile_gannt <- datafile_info_clean %>% 
@@ -296,12 +284,6 @@ fig_c <- ggplot(data = datafile_gannt_plot)+
 
 fig_c
 
-fig_curve/fig_c
-
-# ggsave(filename = '../outcome/science/fig1_c.pdf',
-#        fig_c,
-#        width = 5.5, height = 6, device = cairo_pdf, units = 'cm')
-
 fig <- fig_curve + fig_b + fig_c + fig_d +
   plot_layout(ncol = 2, byrow = T)&
   theme(legend.text = element_text(size = 10, hjust = 0, vjust = .5, face = 'plain', 
@@ -315,12 +297,4 @@ fig <- fig_curve + fig_b + fig_c + fig_d +
 ggsave(filename = './outcome/science/Figure 1.pdf',
        fig,
        width = 18, height = 12, device = cairo_pdf)
-
-# ggsave(filename = './outcome/science/Figure 1.tiff',
-#        fig,
-#        width = 18, height = 12, dpi = 300)
-# 
-# ggsave(filename = './outcome/science/Figure 1.png',
-#        fig,
-#        width = 18, height = 12, dpi = 300)
 
