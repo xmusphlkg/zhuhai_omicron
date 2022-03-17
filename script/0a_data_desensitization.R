@@ -148,7 +148,7 @@ datafile_cont_all <- datafile_cont_raw %>%
     'contact' = '接触',
     'dateexpose' = '暴露日期',
     'datecontact' = '最后接触日期',
-    'durationexpose' = '暴露时长',
+    'durationexpose' = 'days',
     'contactfreq' = '接触频率',
     'vaccine' = '新冠疫苗接种剂次',
     'vaccine1date' = '第一针接种日期',
@@ -186,7 +186,6 @@ datafile_info_clean <- datafile_info_clean %>% select(-name)
 
 save(datafile_info_clean, datafile_cont, datafile_cont_all,file = 'data/data_case.Rdata')
 
-
 # summary -----------------------------------------------------------------
 
 datafile_s1 <- datafile_info_clean %>% 
@@ -200,3 +199,7 @@ names(datafile_s1) <- c('ID', 'Gender', 'Age', 'Infections classification',
                         'Date of positive test', 'Date of infections report',
                         'Date of onset', 'Date of possibly exposed')
 write.xlsx(datafile_s1, file = 'outcome/science/Table S1.xlsx')
+
+df_conts <- datafile_cont_all %>% 
+     group_by(id_cases) %>% 
+     count()

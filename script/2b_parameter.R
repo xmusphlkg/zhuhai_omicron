@@ -18,7 +18,7 @@ set.seed(202202)
 # fit incubation time -----------------------------------------------------
 
 datafile_info <- datafile_info_clean %>% 
-  select(dateonset, dateexpose1, dateexpose2, type) %>% 
+  dplyr::select(dateonset, dateexpose1, dateexpose2, type) %>% 
   mutate(date_seq_1 = dateonset - dateexpose1,
          date_seq_2 = dateonset - dateexpose2) %>% 
   filter(type != 'Asymptomatic')
@@ -197,7 +197,7 @@ fig_a <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                      expand = c(0, 0))+
   scale_y_continuous(expand = expansion(mult = c(0, .1)),
                      labels = label_number(accuracy = 0.01))+
-  labs(x = '',
+  labs(x = 'Time (days)',
        y = 'Relative frequency',
        colour = '',
        title = 'A')
@@ -215,11 +215,11 @@ fig_b <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
   scale_y_continuous(expand = expansion(mult = c(0, .1)),
                      labels = label_number(accuracy = 0.01))+
   labs(x = 'Time (days)',
-       y = 'Relative frequency',
+       y = '',
        colour = '',
        title = 'B')
 
-fig <- fig_a / fig_b  &
+fig <- fig_a + fig_b  &
   theme_bw(base_family = 'Helvetica', base_line_size = 0.2)+
   theme(axis.title.x = element_text(face = 'bold', size = 7),
         axis.title.y = element_text(face = 'bold', size = 7),
@@ -239,7 +239,7 @@ fig <- fig_a / fig_b  &
 fig
 
 ggsave(filename = './outcome/science/Figure 2.pdf', 
-       device = cairo_pdf, height = 10, width = 5.5, units = 'cm')
+       device = cairo_pdf, height = 5.5, width = 12, units = 'cm')
 
 ggsave(filename = './outcome/science/Figure 2.tiff', 
        width = 5.5, height = 10, dpi = 300, units = 'cm')

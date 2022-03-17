@@ -173,6 +173,11 @@ for (i in 3:6) {
                                          'Unfully Vaccinated',
                                          'Fully Vaccinated',
                                          'Booster Dose')))
+  print(swab_x[i-2])
+  test <- datafile_ct_value %>% 
+    group_by(vaccine_g) %>% 
+    summarise(value = mean(value))
+  print(test)
   
   fig_ct <- ggboxplot(data = datafile_ct_value,
                       x = 'vaccine_g',
