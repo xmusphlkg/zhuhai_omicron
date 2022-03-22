@@ -64,7 +64,7 @@ fig_curve <- ggplot(data = datafile_info)+
   geom_text_repel(mapping = aes(x = date, y = value, label = label),
                   data = datafile_label,
                   family = 'Helvetica',
-                  size = 8*5/14,
+                  size = 10*5/14,
                   force_pull   = 0,
                   nudge_y      = 0.8,
                   direction    = "x",
@@ -300,4 +300,4 @@ ggsave(filename = './outcome/publish/Figure 1.pdf',
 
 ggsave(filename = './outcome/publish/Figure 1.tiff',
        fig,
-       width = 18, height = 16, dpi = 300)
+       width = 20, height = 13, dpi = 300)
