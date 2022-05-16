@@ -6,155 +6,64 @@ library(RColorBrewer)
 library(patchwork)
 library(ggsci)
 library(ggpubr)
+library(lme4)
 
 remove(list = ls())
 
 load('./data/data_case.Rdata')
 
-extrafont::font_import('./script/fonts', prompt = F)
-extrafont::loadfonts(device = "win")
+library(showtext)
+font_add('Helvetica', 
+         "./script/fonts/Helvetica.ttf",
+         bold = "./script/fonts/Helvetica-Bold.ttf")
 
-# vaccine effectiveness susceptibility ------------------------------------
+# vaccine effectiveness ---------------------------------------------------
 
-## data clean --------------------------------------------------------------
+datafile_log_BA1 <- datafile_cont_all |> 
+  select(age, vaccine, vaccine_type, vaccine_mix, outcome, seq) |> 
+  mutate(lineage = 'BA.1')
 
-## inner household summary
-datafile_household_sum <- datafile_cont_all %>% 
-  mutate(vaccine_g = factor(vaccine, levels = 0:3,
-                            labels = c(0, 0, 1, 2))) %>% 
-  filter(contact == '同住') %>%
-  group_by(vaccine_g, outcome) %>% 
-  count() %>% 
-  group_by(vaccine_g) %>% 
-  mutate(freq = round(n/sum(n), digits = 4),
-         type = 'Household')
+datafile_log_BA1[which(datafile_log_BA1$vaccine_type == 'P_V'),'vaccine_mix'] <- 'Y'
 
-## outer household summary
-datafile_outer_sum <- datafile_cont_all %>% 
-  mutate(vaccine_g = factor(vaccine, levels = 0:3,
-                            labels = c(0, 0, 1, 2))) %>% 
-  group_by(vaccine_g, outcome) %>% 
-  count() %>% 
-  group_by(vaccine_g) %>% 
-  mutate(freq = round(n/sum(n), digits = 4),
-         type = 'Entire')
+datafile_log_BA2 <- datafile_cont_BA2 |> 
+  select(age, vaccine, vaccine_type, vaccine_mix, outcome, seq) |> 
+  mutate(lineage = 'BA.2',
+         vaccine = if_else(is.na(vaccine),0,vaccine))
 
-datafile_plot <- rbind(datafile_household_sum, datafile_outer_sum) %>% 
-  mutate(vaccine_g = factor(vaccine_g, levels = 0:2,
-                            labels = c('Unfully Vaccinated',
-                                       'Fully Vaccinated',
-                                       'Booster Dose'))) %>% 
-  filter(outcome == 1)
+datafile_log <- rbind(datafile_log_BA1, datafile_log_BA2) |> 
+  mutate(seq_g = if_else(seq >=14 & seq <=120,
+                         "inner",
+                         "outer"),
+         vaccine_g = str_remove_all(vaccine_type, '[_]'),
+         vaccine_g = sapply(vaccine_g, FUN = function(x){
+           paste(sort(unique(strsplit(x, "")[[1]])), collapse = '')
+         })) |> 
+  filter(!(is.na(seq_g)&vaccine>0)) |> 
+  filter(!is.na(age)) |> 
+  mutate(vaccine = factor(vaccine, levels = 0:3),
+         vaccine_g = if_else(vaccine == 0,
+                             '0',
+                             vaccine_g),
+         vaccine_g = if_else(vaccine_mix == 'Y' & vaccine != 0,
+                             "M",
+                             vaccine_g),
+         vaccine_g = paste(vaccine, vaccine_g, sep = "_"))
 
-plot_text <- c(as.numeric(((datafile_plot[1,'freq'] - datafile_plot[2,'freq'])/datafile_plot[1,'freq'])*100),
-               as.numeric(((datafile_plot[1,'freq'] - datafile_plot[3,'freq'])/datafile_plot[1,'freq'])*100))
-plot_text <- round(plot_text, 2)
+datafile_count <- datafile_log |> 
+  group_by(vaccine_g) |> 
+  count() |> 
+  filter(n>10)
 
-## plot --------------------------------------------------------------------
+datafile_log_BA1 <- datafile_log |> 
+  filter(vaccine_g %in% datafile_count$vaccine_g &
+           lineage == 'BA.1')
 
-fig1 <- ggplot(data = datafile_plot)+
-  geom_point(mapping = aes(x = vaccine_g, y = freq, 
-                           group = type, color = type), 
-             shape = 17)+
-  geom_line(mapping = aes(x = vaccine_g, y = freq, 
-                          group = type, color = type),
-            show.legend = F)+
-  scale_color_nejm()+
-  scale_y_continuous(limits = c(0, 0.3), 
-                     expand = c(0, 0),
-                     labels = function(x) paste0(x*100, "%"))+
-  theme_bw(base_family = 'Helvetica')+
-  theme(legend.title = element_text(face = 'bold', size = 12),
-        legend.text = element_text(size = 10),
-        legend.box.background = element_rect(fill = "transparent", colour = 'transparent'),
-        legend.background = element_rect(fill = "transparent", colour = 'transparent'),
-        legend.position = c(0.3,0.8))+
-  labs(x = '',
-       y = 'SAR',
-       color = 'Classification\nof contact',
-       title = 'a')
+model <- glm(outcome ~ vaccine_g + age,
+             family = "binomial",
+             data = datafile_log_BA1)
 
+confint(model)
 
-# vaccine effectiveness contagious ----------------------------------------
-
-## data clean --------------------------------------------------------------
-
-datafile_info <- datafile_info_clean %>% 
-  select(id, vaccine) %>% 
-  mutate(vaccine = factor(vaccine, levels = 0:3,
-                            labels = c('Unfully Vaccinated',
-                                       'Unfully Vaccinated',
-                                       'Fully Vaccinated',
-                                       'Booster Dose')))
-
-## inner household each case
-
-datafile_household <- datafile_cont_all %>% 
-  select(id_cases, outcome, contact) %>% 
-  filter(contact == '同住') %>%
-  group_by(id_cases, outcome) %>% 
-  count() %>% 
-  ungroup() %>% 
-  complete(id_cases,
-           outcome,
-           fill = list(
-             n = 0,
-             freq = 0
-           )) %>% 
-  group_by(id_cases) %>% 
-  mutate(freq = round(n/sum(n), digits = 4),
-         type = 'Household') %>% 
-  left_join(datafile_info, by = c('id_cases' = 'id')) %>% 
-  filter(outcome == 1)
-
-## inner household summary
-datafile_household_sum <- datafile_cont_all %>%
-  select(id_cases, outcome, contact) %>%
-  filter(contact == '同住') %>%
-  left_join(datafile_info, by = c('id_cases' = 'id')) %>%
-  group_by(vaccine, outcome) %>%
-  count() %>%
-  group_by(vaccine) %>%
-  mutate(freq = round(n/sum(n), digits = 4),
-         type = 'Household')
-
-## outer household
-datafile_outer_sum <- datafile_cont_all %>% 
-  select(id_cases, outcome, contact) %>% 
-  left_join(datafile_info, by = c('id_cases' = 'id')) %>% 
-  group_by(vaccine, outcome) %>% 
-  count() %>% 
-  group_by(vaccine) %>% 
-  mutate(freq = round(n/sum(n), digits = 4),
-         type = 'Entire')
-
-datafile_plot <- rbind(datafile_household_sum, datafile_outer_sum) %>% 
-  filter(outcome == 1)
-
-## plot --------------------------------------------------------------------
-
-fig2 <- ggplot(data = datafile_plot)+
-  geom_point(mapping = aes(x = vaccine, y = freq, 
-                           group = type, color = type), 
-             shape = 17)+
-  geom_line(mapping = aes(x = vaccine, y = freq, 
-                          group = type, color = type),
-            show.legend = F)+
-  scale_color_nejm()+
-  scale_y_continuous(limits = c(0, 0.3), 
-                     expand = c(0, 0),
-                     labels = function(x) paste0(x*100, "%"))+
-  theme_bw(base_family = 'Helvetica')+
-  theme(legend.title = element_text(face = 'bold', size = 12),
-        legend.text = element_text(size = 10),
-        legend.box.background = element_rect(fill = "transparent", colour = 'transparent'),
-        legend.background = element_rect(fill = "transparent", colour = 'transparent'),
-        legend.position = c(0.3,0.8))+
-  labs(x = '',
-       y = 'SAR',
-       color = 'Classification\nof contact',
-       title = 'b')
-fig1+fig2
 
 # Ct value ----------------------------------------------------------------
 

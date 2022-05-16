@@ -120,7 +120,7 @@ model  <- mparse(transitions = c("S1 -> beta*S1*((I2_p + I2_s + I2_a)*(1 - vei) 
                                  "I1_s -> gamma_5*I1_s -> R1",
                                  ## accept vaccine
                                  "S2 -> beta*S2*((I2_p + I2_s + I2_a)*(1 - vei) + I1_p + I1_s + I1_a)*(1 - vsi)/N2 -> E2",
-                                 "E2 -> gamma_2*(1-p)*E2 -> I2_p",
+                                 "E2 -> gamma_1*(1-p)*E2 -> I2_p",
                                  "E2 -> gamma_2*p*E2 -> I2_a",
                                  "I2_p -> gamma_3*I2_p -> I2_s",
                                  "I2_a -> gamma_4*I2_a -> R2",
@@ -417,7 +417,7 @@ model  <- mparse(transitions = c("S1 -> beta*S1*((I2_p + I2_s + I2_a)*(1 - vei) 
                                  "I1_s -> gamma_5*I1_s -> R1",
                                  ## accept vaccine
                                  "S2 -> beta*S2*((I2_p + I2_s + I2_a)*(1 - vei) + I1_p + I1_s + I1_a)*(1 - vsi)/N2 -> E2",
-                                 "E2 -> gamma_2*(1-p)*E2 -> I2_p",
+                                 "E2 -> gamma_1*(1-p)*E2 -> I2_p",
                                  "E2 -> gamma_2*p*E2 -> I2_a",
                                  "I2_p -> gamma_3*I2_p -> I2_s",
                                  "I2_a -> gamma_4*I2_a -> R2",

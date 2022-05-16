@@ -166,7 +166,13 @@ datafile_cont_all <- datafile_cont_raw %>%
          vaccine = ifelse(vaccinelastdate > as.Date('2022/01/08')-14,
                           vaccine - 1,
                           vaccine),
-         vaccine = ifelse(is.na(vaccine), 0, vaccine))
+         vaccine = ifelse(is.na(vaccine), 0, vaccine),
+         vaccine = case_when(
+           vaccine_type %in% c('CCC', 'PCC') ~ 2,
+           vaccine_type %in% c('C', 'CC') ~ 1,
+           vaccine_type == 'A' ~ 2,
+           TRUE ~ vaccine
+         ))
 
 ## add id
 
@@ -191,11 +197,11 @@ save(datafile_info_clean, datafile_cont, datafile_cont_all,file = 'data/data_cas
 datafile_s1 <- datafile_info_clean %>% 
   mutate_at(vars(contains('date')), format, '%Y/%m/%d') %>% 
   mutate(exposedate = paste(dateexpose1, 'to', dateexpose2)) %>% 
-  select(c("id", "gender", "age", "type", "locationcluster", 
-           "vaccine", "datepositive", "datereported", "dateonset", 
+  select(c("id", "gender", "age", "type", "locationcluster", 'vaccine',
+           "vaccine_type", "datepositive", "datereported", "dateonset", 
            "exposedate"))
 names(datafile_s1) <- c('ID', 'Gender', 'Age', 'Infections classification', 
-                        'Cluster of infections', 'Vaccine dose',
+                        'Cluster of infections', 'Vaccine dose','Vaccine type', 
                         'Date of positive test', 'Date of infections report',
                         'Date of onset', 'Date of possibly exposed')
 write.xlsx(datafile_s1, file = 'outcome/science/Table S1.xlsx')
@@ -203,3 +209,27 @@ write.xlsx(datafile_s1, file = 'outcome/science/Table S1.xlsx')
 df_conts <- datafile_cont_all %>% 
      group_by(id_cases) %>% 
      count()
+
+# BA2 ---------------------------------------------------------------------
+
+datafile_cont_BA2 <- read.xlsx('./data/Omicron_BA2_contact.xlsx')
+datafile_cont_BA2$vac1date <- convertToDate(datafile_cont_BA2$vac1date)
+datafile_cont_BA2$vac2date <- convertToDate(datafile_cont_BA2$vac2date)
+datafile_cont_BA2$vac3date <- convertToDate(datafile_cont_BA2$vac3date)
+datafile_cont_BA2$vaccinelastdate <- convertToDate(datafile_cont_BA2$vaccinelastdate)
+datafile_cont_BA2$lastexposedate <- convertToDate(datafile_cont_BA2$lastexposedate)
+
+datafile_cont_BA2 <- datafile_cont_BA2 |> 
+  mutate(seq = lastexposedate - vaccinelastdate,
+         vaccine = if_else(seq <14, 
+                           vaccine-1,
+                           vaccine))
+
+datafile_cont_all <- datafile_cont_all |> 
+  mutate(vaccinelastdate = as.Date(vaccinelastdate),
+         seq = datecontact - vaccinelastdate,
+         seq = ifelse(is.na(seq),
+                      as.Date(virustesttime) - vaccinelastdate,
+                      seq))
+
+save.image('./data/data_case.Rdata')
