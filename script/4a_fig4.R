@@ -108,7 +108,7 @@ fig_ct_vaccine_n <- ggplot(datafile_info,
                         na.translate = F)+
      theme_classic(base_family = 'Helvetica')+
      labs(x = '',
-          y = 'Ct value',
+          y = 'N gene Ct value',
           title = 'a')
 
 fig_ct_voc_o <- ggplot(datafile_info,
@@ -167,7 +167,7 @@ fig_ct_vaccine_o <- ggplot(datafile_info,
                         na.translate = F)+
      theme_classic(base_family = 'Helvetica')+
      labs(x = '',
-          y = '',
+          y = 'ORF gene Ct value',
           title = 'c')
 
 
@@ -197,10 +197,12 @@ fig_ct_n <- ggplot(datafile_info,
      theme_classic(base_family = 'Helvetica')+
      theme(plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
            plot.margin = margin(0, 0.2, 0, 0, "cm"),
-           axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
-           strip.text = element_text(size = 10, hjust = .5, vjust = 1, face = 'plain', color = 'black'),
+           axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
+           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
+           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
+           strip.text.x = element_text(size = 12, face = 'bold'),
+           strip.text.y = element_text(size = 12, face = 'bold'),
            strip.placement = "outside",
            strip.background = element_rect(color = NA),
            panel.spacing.x = unit(0, 'mm'))+
@@ -210,7 +212,7 @@ fig_ct_n <- ggplot(datafile_info,
                                          'B' = 'Fully Vaccinated',
                                          'A' = 'Booster Dose')))+
      labs(x = '',
-          y = 'Ct value',
+          y = 'N gene Ct value',
           title = 'e')
 
 fig_ct_o <- ggplot(datafile_info,
@@ -239,10 +241,12 @@ fig_ct_o <- ggplot(datafile_info,
      theme_classic(base_family = 'Helvetica')+
      theme(plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
            plot.margin = margin(0, 0.2, 0, 0, "cm"),
-           axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
-           strip.text = element_text(size = 10, hjust = .5, vjust = 1, face = 'plain', color = 'black'),
+           axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
+           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
+           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
+           strip.text.x = element_text(size = 12, face = 'bold'),
+           strip.text.y = element_text(size = 12, face = 'bold'),
            strip.placement = "outside",
            strip.background = element_rect(color = NA),
            panel.spacing.x = unit(0, 'mm'))+
@@ -252,7 +256,7 @@ fig_ct_o <- ggplot(datafile_info,
                                          'B' = 'Fully Vaccinated',
                                          'A' = 'Booster Dose')))+
      labs(x = '',
-          y = '',
+          y = 'ORF gene Ct value',
           title = 'f')
 
 # logistics regression ----------------------------------------------------
@@ -391,7 +395,7 @@ fig_log_unjust <- ggplot(data = filter(datafile_res, just == 'No'),
                            na.translate = F)+
         theme_classic(base_family = 'Helvetica')+
         labs(x = '',
-             y = 'OR',
+             y = 'Odds ratio',
              title = 'g',
              color = 'VOC')
 
@@ -420,7 +424,7 @@ fig_log_just <- ggplot(data = filter(datafile_res, just == 'Age'),
                            na.translate = F)+
         theme_classic(base_family = 'Helvetica')+
         labs(x = '',
-             y = '',
+             y = 'Adjusted odds ratio',
              title = 'h',
              color = 'VOC')
 
@@ -442,9 +446,11 @@ fig_log <- fig_log_unjust + fig_log_just&
               axis.text.x = element_blank(),
               plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
               plot.margin = margin(0, 0.1, 0, 0.1, "cm"),
-              axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-              axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
-              strip.text = element_text(size = 10, hjust = .5, vjust = 1, face = 'plain', color = 'black'),
+              axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
+              axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
+              axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
+              strip.text.x = element_text(size = 12, face = 'bold'),
+              strip.text.y = element_text(size = 12, face = 'bold'),
               strip.placement = "outside",
               strip.background = element_rect(color = NA),
               panel.spacing.x = unit(0, 'mm'),
@@ -464,7 +470,8 @@ fig_ct <- fig_ct_vaccine_n + fig_ct_voc_n + fig_ct_vaccine_o + fig_ct_voc_o +
            plot.margin = margin(0, 0.1, 0, 0.1, "cm"),
            axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
            axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
+           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
+           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
            strip.text = element_text(size = 10, hjust = .5, vjust = 1, face = 'plain', color = 'black'),
            strip.placement = "outside",
            strip.background = element_rect(color = NA),

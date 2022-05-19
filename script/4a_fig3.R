@@ -449,6 +449,14 @@ fig_ib <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    args = list(shape = ib_ba2$distribution$parameters$shape, 
                                scale = ib_ba2$distribution$parameters$scale),
                    mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.4,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Incubation period of VOC')+
+     coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color,
                         breaks = datafile$variant)+
      scale_x_continuous(breaks = seq(0, 15, 3),
@@ -507,6 +515,14 @@ fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    args = list(shape = si_ba2$shape, 
                                rate = si_ba2$rate),
                    mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.5,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Serial interval of VOC')+
+     coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color,
                         breaks = datafile$variant)+
      scale_x_continuous(breaks = seq(0, 15, 3),
@@ -569,6 +585,14 @@ fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    args = list(shape = tg_ba2$estimate[1], 
                                rate = tg_ba2$estimate[2]),
                    mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.4,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Transmission generation of VOC')+
+     coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color,
                         breaks = datafile$variant)+
      scale_x_continuous(breaks = seq(0, 15, 3),
@@ -580,7 +604,7 @@ fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      labs(x = 'Time (days)',
           y = 'Relative frequency',
           colour = '',
-          title = 'b')+
+          title = 'd')+
      guides(color = 'none')
 
 fig_tg <- fig_tg + 
@@ -630,27 +654,26 @@ fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    args = list(shape = gt_ba2$estimate[1], 
                                rate = gt_ba2$estimate[2]),
                    mapping = aes(colour = 'BA.2'))+
-     # stat_function(fun = dgamma, n = 100,
-     #               args = list(shape = gt_max_ba2$estimate[1], 
-     #                           rate = gt_max_ba2$estimate[2]),
-     #               mapping = aes(linetype = 'Max',
-     #                             colour = 'BA.2')) +
-     # stat_function(fun = dgamma, n = 100,
-     #               args = list(shape = gt_min_ba2$estimate[1], 
-     #                           rate = gt_min_ba2$estimate[2]),
-     #               mapping = aes(linetype = 'Min',
-     #                             colour = 'BA.2')) +
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.8,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Generation time (probable) of VOC')+
+     coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color, 
                         breaks = datafile$variant)+
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
-     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.8),
                         labels = label_number(accuracy = 0.1))+
      theme_classic(base_family = 'Helvetica')+
      labs(x = 'Time (days)',
           y = 'Relative frequency',
           colour = '',
-          title = 'd')+
+          title = 'c')+
      guides(color = 'none')
 
 fig_gt <- fig_gt + 
@@ -685,6 +708,14 @@ fig_diff <- ggplot(datafile)+
                   fill = fill_color)+
      scale_x_continuous(expand = c(0, 0),
                         limits = c(-5, 10))+
+     annotate(geom = 'text',
+              x = 2.5,
+              y = Inf,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Differ between SI and IP')+
+     coord_cartesian(clip = "off")+
      theme_classic(base_family = 'Helvetica')+
      labs(x = 'Time (days)',
           y = '',
@@ -720,6 +751,14 @@ fig_reff <- ggplot(data = datafile,
                vjust = -1,
                hjust = -0.1
      )+
+     annotate(geom = 'text',
+              x = 5,
+              y = Inf,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Effective reproductive number')+
+     coord_cartesian(clip = "off")+
      scale_fill_manual(values = fill_color,
                        breaks = datafile$variant)+
      scale_y_discrete(limits = datafile$variant)+
@@ -735,7 +774,7 @@ fig_reff <- ggplot(data = datafile,
 
 # multiplot ---------------------------------------------------------------
 
-fig <- fig_ib + fig_tg + fig_si + fig_gt + fig_diff + fig_reff+
+fig <- fig_ib + fig_gt + fig_si + fig_tg + fig_diff + fig_reff+
      plot_layout(ncol = 2, byrow = T) &
      theme(axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
            axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
