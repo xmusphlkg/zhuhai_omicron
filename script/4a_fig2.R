@@ -16,9 +16,11 @@ font_add('Helvetica',
 
 remove(list = ls())
 
-fill_color <- c("#20854EFF", alpha("#20854EFF", 0.3),
-                "#E18727FF", alpha("#E18727FF", 0.3), 
-               "#BC3C29FF", alpha("#BC3C29FF", 0.3))
+fill_color <- c(alpha("#BC3C29FF", 0.3), "#BC3C29FF", 
+                alpha("#E18727FF", 0.3), "#E18727FF",
+                alpha("#20854EFF", 0.3), "#20854EFF" 
+                )
+fill_color_1 <- pal_nejm()(8)[c(2, 5:8)]
 
 load('./data/sars_2_cov.Rdata')
 
@@ -52,7 +54,10 @@ datafile_info <- rbind(datafile_info_Delta,
 datafile_percent <- datafile_info |> 
      group_by(age_g, lineage, vaccine, vaccine_mix) |> 
      count() |> 
-     mutate(group = paste(vaccine, vaccine_mix, sep = "_"))
+     ungroup() |> 
+     mutate(group = paste(vaccine, vaccine_mix, sep = "_"),
+            group = factor(group,
+                           levels = c("C_U", "C_M", "B_U", "B_M", "A_U", "A_M")))
 
 datafile_total <- datafile_info |> 
      group_by(age_g, lineage) |> 
@@ -66,14 +71,13 @@ datafile_label <- data.frame(x = rep(1, 3),
 
 # infections plot ---------------------------------------------------------
 
-
-fig_inf <- ggplot(filter(datafile_percent))+
+fig_inf <- ggplot(datafile_percent)+
      geom_bar(mapping = aes(y = age_g,
                             x = n, 
                             fill = group),
               color = 'black',
               stat="identity",
-              position = "fill",
+              position = position_fill(reverse = T),
               show.legend = T)+
      geom_text(data = filter(datafile_total),
                mapping = aes(x = 1,
@@ -93,8 +97,8 @@ fig_inf <- ggplot(filter(datafile_percent))+
                 ncol = 1,
                 scales = 'free_x',
                 labeller = as_labeller(c(
-                      Delta = 'c',
-                      BA1 = 'b',
+                      Delta = 'e',
+                      BA1 = 'c',
                       BA2 = 'a'
                 )))+
      scale_y_discrete(labels = c('0-18', '19-64', '65-'),
@@ -103,12 +107,13 @@ fig_inf <- ggplot(filter(datafile_percent))+
      scale_x_continuous(n.breaks = 6,
                         expand =  expansion(add = c(0, 0)))+
      scale_fill_manual(values = fill_color,
-                       labels = c('Booster Dose & Mixed', 
-                                  'Booster Dose & Unmixed', 
-                                  'Fully Vaccinated & Mixed', 
-                                  'Fully Vaccinated & Unmixed',
+                       labels = c('Unfully Vaccinated & Unmixed', 
                                   'Unfully Vaccinated & Mixed',
-                                  'Unfully Vaccinated & Unmixed'),
+                                  'Fully Vaccinated & Unmixed',
+                                  'Fully Vaccinated & Mixed', 
+                                  'Booster Dose & Unmixed', 
+                                  'Booster Dose & Mixed'
+                                  ),
                        na.translate = F)+
      coord_cartesian(clip = "off")+
      theme_classic(base_family = 'Helvetica')+
@@ -141,7 +146,10 @@ datafile_percent <- datafile_cont |>
      group_by(age_g, lineage, vaccine, vaccine_mix) |> 
      count() |> 
      filter(!is.na(age_g)) |> 
-     mutate(group = paste(vaccine, vaccine_mix, sep = "_"))
+     ungroup() |> 
+     mutate(group = paste(vaccine, vaccine_mix, sep = "_"),
+            group = factor(group,
+                           levels = c("C_U", "C_M", "B_U", "B_M", "A_U", "A_M")))
 
 datafile_total <- datafile_cont |> 
      group_by(age_g, lineage) |> 
@@ -155,13 +163,13 @@ datafile_label <- data.frame(x = rep(1, 3),
 
 # contacts ----------------------------------------------------------------
 
-fig_cont <- ggplot(filter(datafile_percent))+
+fig_cont <- ggplot(datafile_percent)+
      geom_bar(mapping = aes(y = age_g,
                             x = n, 
                             fill = group),
               color = 'black',
               stat="identity",
-              position = "fill",
+              position = position_fill(reverse = T),
               show.legend = T)+
      geom_text(data = filter(datafile_total),
                mapping = aes(x = 1,
@@ -182,8 +190,8 @@ fig_cont <- ggplot(filter(datafile_percent))+
                 scales = 'free_x',
                 labeller = as_labeller(c(
                      Delta = 'f',
-                     BA1 = 'e',
-                     BA2 = 'd'
+                     BA1 = 'd',
+                     BA2 = 'b'
                 )))+
      scale_y_discrete(labels = c('0-18', '19-64', '65-'),
                       expand = c(0, 0.6),
@@ -191,12 +199,13 @@ fig_cont <- ggplot(filter(datafile_percent))+
      scale_x_continuous(n.breaks = 6,
                         expand =  expansion(add = c(0, 0)))+
      scale_fill_manual(values = fill_color,
-                       labels = c('Booster Dose & Mixed', 
-                                  'Booster Dose & Unmixed', 
-                                  'Fully Vaccinated & Mixed', 
-                                  'Fully Vaccinated & Unmixed',
+                       labels = c('Unfully Vaccinated & Unmixed', 
                                   'Unfully Vaccinated & Mixed',
-                                  'Unfully Vaccinated & Unmixed'),
+                                  'Fully Vaccinated & Unmixed',
+                                  'Fully Vaccinated & Mixed', 
+                                  'Booster Dose & Unmixed', 
+                                  'Booster Dose & Mixed'
+                       ),
                        na.translate = F)+
      coord_cartesian(clip = "off")+
      theme_classic(base_family = 'Helvetica')+
@@ -204,7 +213,7 @@ fig_cont <- ggplot(filter(datafile_percent))+
           x = 'Proportions',
           fill = 'Vaccination status')
 
-# combind plot ------------------------------------------------------------
+# combined plot ------------------------------------------------------------
 
 fig_1 <- fig_inf + fig_cont +
      plot_layout(guides = 'collect')&
@@ -221,6 +230,124 @@ fig_1 <- fig_inf + fig_cont +
 
 fig_1
 
+# vaccine manufacturer ----------------------------------------------------
+
+datafile_cont <- rbind(datafile_cont_Delta,
+                       datafile_cont_BA1,
+                       mutate(datafile_cont_BA2, gender = NA))|> 
+        select(age, vaccine, vaccine_type, vaccine_mix, lineage) |> 
+        mutate(age_g = if_else(age <=18, 'c', 'a'),
+               age_g = if_else(age >=65, 'o', age_g),
+               age_g = factor(age_g, levels = c('c', 'a', 'o')),
+               vaccine_mix = if_else(is.na(vaccine_mix), 
+                                     'N', 
+                                     vaccine_mix)) |> 
+        mutate(vaccine = factor(vaccine, 
+                                levels = 0:3,
+                                labels = c('C', 'C', 'B', 'A')),
+               vaccine_mix = if_else(vaccine_mix == 'Y', 'M', 'U'),
+               vaccine_g = str_remove_all(vaccine_type, '[_]'),
+               vaccine_g = sapply(vaccine_g, FUN = function(x){
+                       paste(sort(unique(strsplit(x, "")[[1]])), collapse = '')
+               })) |> 
+        group_by(vaccine, vaccine_g, lineage) |> 
+        count() |> 
+        ungroup() |> 
+        filter(vaccine_g != "")
+
+datafile_cont_back <- datafile_cont |> 
+        group_by(lineage, vaccine) |> 
+        summarise(n = sum(n),
+                  .groups = 'drop')
+
+# datafile_cont_top <- datafile_cont |>
+#         arrange(desc(n)) |>
+#         group_by(lineage, vaccine) |>
+#         slice(1:3)
+datafile_cont_top <- datafile_cont |> 
+        group_by(lineage, vaccine) |> 
+        filter(vaccine_g %in% c('P', 'V', 'C', 'PV')) |> 
+        select(vaccine, vaccine_g, lineage, n)
+
+datafile_cout_sum <- datafile_cont_top |> 
+        summarise(n = sum(n),
+                  .groups = 'drop') |> 
+        left_join(datafile_cont_back,
+                  by = c("lineage", "vaccine")) |> 
+        mutate(n = n.y - n.x,
+               vaccine_g = 'Other') |> 
+        select(lineage, vaccine, vaccine_g, n) |> 
+        rbind(datafile_cont_top) |> 
+        mutate(vaccine_g = if_else(vaccine_g == "",
+                                   'Unvaccine',
+                                   vaccine_g),
+               vaccine_g = factor(vaccine_g,
+                                  levels = c('P', 'V', 'C', 'PV', 'Other', 'Unvaccine')))
+
+# plot --------------------------------------------------------------------
+
+datafile_label <- data.frame(x = rep('B', 3),
+                             y = rep(2500, 3),
+                             label = c('Omicron BA.2 outbreak',
+                                       'Omicron BA.1 outbreak',
+                                       'Delta outbreak'),
+                             lineage = c('BA2', 'BA1', 'Delta'))
+
+fig_2 <- ggplot(data = datafile_cout_sum)+
+        geom_col(mapping = aes(x = vaccine,
+                               y = n, 
+                               fill = vaccine_g),
+                 color = 'black',
+                 position = position_dodge2(width = 0.9, preserve = "single"),
+                 show.legend = T)+
+        geom_text(data = filter(datafile_label),
+                  mapping = aes(x = x,
+                                y = y,
+                                label = label),
+                  vjust = -0.2,
+                  family = 'Helvetica')+
+        facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))),
+                   nrow = 1,
+                   scales = 'free_y',
+                   labeller = as_labeller(c(
+                           Delta = 'i',
+                           BA1 = 'h',
+                           BA2 = 'g'
+                   )))+
+        scale_x_discrete(labels = c('Unfully Vaccinated', 'Fully Vaccinated', 'Booster Dose'),
+                         expand = c(0, 0.6),
+                         breaks = c('C', 'B', 'A'))+
+        scale_y_continuous(limits = c(0, 2500),
+                           expand = c(0, 0))+
+        scale_fill_manual(values = fill_color_1,
+                          labels = c('Sinopharm',
+                                     'Sinovac',
+                                     'Cansino',
+                                     'Sinopharm & Sinovac',
+                                     'Other',
+                                     'Unvaccined'),
+                          na.translate = F)+
+        coord_cartesian(clip = "off")+
+        theme_classic(base_family = 'Helvetica')+
+        theme(plot.title = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+              plot.margin = margin(0, 1, 0, 0.25, "cm"),
+              axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+              axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+              axis.title.y = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
+              strip.text = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+              strip.background = element_blank(),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              legend.position = 'bottom')+
+        labs(y = "Contacts",
+             x = '',
+             fill = 'Manufacturer')
+
+# combined plot -----------------------------------------------------------
+
+cowplot::plot_grid(fig_1, fig_2, 
+                   ncol = 1,
+                   rel_heights = c(1.75, 1))
+
 ggsave(filename = './outcome/publish/Figure 2.pdf',
-       fig_1,
-       width = 14, height = 7)
+       width = 14, height = 11)

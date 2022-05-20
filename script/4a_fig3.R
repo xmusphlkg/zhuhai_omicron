@@ -291,7 +291,7 @@ datafile_cont_1 <- datafile_cont_1 %>%
             gt_median = datafile_expose_seq[,2],
             gt_max = datafile_expose_seq[,3])
 
-gt_ba1 <- fitdistr(as.numeric(datafile_cont_1$gt_median + 0.002), "gamma")
+gt_ba1 <- fit_best(as.numeric(datafile_cont_1$gt_median), "gamma")
 
 data_expose <- datafile_info_BA2 %>% 
      dplyr::select(id, dateexpose1, dateexpose2)
@@ -317,7 +317,7 @@ datafile_cont_2 <- datafile_cont_2 %>%
             gt_median = datafile_expose_seq[,2],
             gt_max = datafile_expose_seq[,3])
 
-gt_ba2 <- fitdistr(as.numeric(datafile_cont_2$gt_median + 0.002), "gamma")
+gt_ba2 <- fit_best(as.numeric(datafile_cont_2$gt_median), "gamma")
 
 data_expose <- datafile_info_Delta %>% 
      dplyr::select(id, dateexpose1, dateexpose2)
@@ -338,7 +338,7 @@ datafile_cont_3 <- datafile_chains_Delta %>%
      mutate(gt_median = as.numeric(infectee_exposedate1 - infector_exposedate1),
             gt_median = if_else(gt_median<0, 0, gt_median))
 
-gt_delta <- fitdistr(as.numeric(datafile_cont_3$gt_median + 0.002), "gamma")
+gt_delta <- fit_best(as.numeric(datafile_cont_3$gt_median), "gamma")
 
 # estimate TG -------------------------------------------------------------
 
@@ -390,9 +390,9 @@ datafile_cont_3 <- datafile_chains_Delta %>%
      mutate(date_sep = infectee_date - infector_date) %>% 
      filter(date_sep >=0)
 
-tg_ba1 <- fitdistr(as.numeric(datafile_cont_1$date_sep), "gamma")
-tg_ba2 <- fitdistr(as.numeric(datafile_cont_2$date_sep + 0.002), "gamma")
-tg_delta <- fitdistr(as.numeric(datafile_cont_3$date_sep + 0.002), "gamma")
+tg_ba1 <- fit_best(as.numeric(datafile_cont_1$date_sep), "gamma")
+tg_ba2 <- fit_best(as.numeric(datafile_cont_2$date_sep), "gamma")
+tg_delta <- fit_best(as.numeric(datafile_cont_3$date_sep), "gamma")
 
 # write data --------------------------------------------------------------
 
@@ -528,7 +528,7 @@ fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
      scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.5),
+                        limits = c(0, 0.4),
                         labels = label_number(accuracy = 0.1))+
      labs(x = 'Time (days)',
           y = 'Relative frequency',
@@ -545,8 +545,8 @@ fig_si <- fig_si +
 
 datafile <- data.frame(
      variant = c('Delta', 'BA.1', 'BA.2'),
-     shape = c(tg_delta$estimate[1], tg_ba1$estimate[1], tg_ba2$estimate[1]),
-     rate = c(tg_delta$estimate[2], tg_ba1$estimate[2], tg_ba2$estimate[2])
+     shape = c(tg_delta$shape, tg_ba1$shape, tg_ba2$shape),
+     rate = c(tg_delta$rate, tg_ba1$rate, tg_ba2$rate)
 ) |> 
      mutate(mean = shape/rate,
             sd = sqrt(shape)/rate)
@@ -574,16 +574,16 @@ fig_tg_inside <- ggplot(data = datafile,
 
 fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_delta$estimate[1], 
-                               rate = tg_delta$estimate[2]),
+                   args = list(shape = tg_delta$shape, 
+                               rate = tg_delta$rate),
                    mapping = aes(colour = 'Delta'))+
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_ba1$estimate[1], 
-                               rate = tg_ba1$estimate[2]),
+                   args = list(shape = tg_ba1$shape, 
+                               rate = tg_ba1$rate),
                    mapping = aes(colour = 'BA.1'))+
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_ba2$estimate[1], 
-                               rate = tg_ba2$estimate[2]),
+                   args = list(shape = tg_ba2$shape, 
+                               rate = tg_ba2$rate),
                    mapping = aes(colour = 'BA.2'))+
      annotate(geom = 'text',
               x = 7.5,
@@ -614,8 +614,8 @@ fig_tg <- fig_tg +
 
 datafile <- data.frame(
      variant = c('Delta', 'BA.1', 'BA.2'),
-     shape = c(gt_delta$estimate[1], gt_ba1$estimate[1], gt_ba2$estimate[1]),
-     rate = c(gt_delta$estimate[2], gt_ba1$estimate[2], gt_ba2$estimate[2])
+     shape = c(gt_delta$shape, gt_ba1$shape, gt_ba2$shape),
+     rate = c(gt_delta$rate, gt_ba1$rate, gt_ba2$rate)
 ) |> 
      mutate(mean = shape/rate,
             sd = sqrt(shape)/rate)
@@ -643,16 +643,16 @@ fig_gt_inside <- ggplot(data = datafile,
 
 fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_delta$estimate[1], 
-                               rate = gt_delta$estimate[2]),
+                   args = list(shape = gt_delta$shape, 
+                               rate = gt_delta$rate),
                    mapping = aes(colour = 'Delta'))+
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_ba1$estimate[1], 
-                               rate = gt_ba1$estimate[2]),
+                   args = list(shape = gt_ba1$shape, 
+                               rate = gt_ba1$rate),
                    mapping = aes(colour = 'BA.1'))+
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_ba2$estimate[1], 
-                               rate = gt_ba2$estimate[2]),
+                   args = list(shape = gt_ba2$shape, 
+                               rate = gt_ba2$rate),
                    mapping = aes(colour = 'BA.2'))+
      annotate(geom = 'text',
               x = 7.5,
