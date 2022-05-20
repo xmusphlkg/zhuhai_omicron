@@ -5,6 +5,7 @@ library(tidyverse)
 library(patchwork)
 library(scales)
 library(openxlsx)
+library(ggsci)
 
 library(showtext)
 font_add('Helvetica', 
@@ -405,7 +406,7 @@ save(si_ba1, si_ba2, si_delta,
 
 library(cowplot)
 
-fill_color <- rev(pal_nejm()(4))[-3]
+fill_color <- rev(ggsci::pal_nejm()(4))[-3]
 
 ## plot ib -----------------------------------------------------------------
 
@@ -465,7 +466,7 @@ fig_ib <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                         limits = c(0, 0.4),
                         labels = label_number(accuracy = 0.1))+
      theme_classic(base_family = 'Helvetica')+
-     labs(x = 'Time (days)',
+     labs(x = '',
           y = 'Relative frequency',
           colour = '',
           title = 'a')+
@@ -517,7 +518,7 @@ fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    mapping = aes(colour = 'BA.2'))+
      annotate(geom = 'text',
               x = 7.5,
-              y = 0.5,
+              y = 0.4,
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
@@ -587,7 +588,7 @@ fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    mapping = aes(colour = 'BA.2'))+
      annotate(geom = 'text',
               x = 7.5,
-              y = 0.4,
+              y = 0.5,
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
@@ -598,11 +599,11 @@ fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
      scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.4),
+                        limits = c(0, 0.5),
                         labels = label_number(accuracy = 0.1))+
      theme_classic(base_family = 'Helvetica')+
      labs(x = 'Time (days)',
-          y = 'Relative frequency',
+          y = '',
           colour = '',
           title = 'd')+
      guides(color = 'none')
@@ -656,7 +657,7 @@ fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
                    mapping = aes(colour = 'BA.2'))+
      annotate(geom = 'text',
               x = 7.5,
-              y = 0.8,
+              y = 0.5,
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
@@ -667,13 +668,13 @@ fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
      scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.8),
+                        limits = c(0, 0.5),
                         labels = label_number(accuracy = 0.1))+
      theme_classic(base_family = 'Helvetica')+
-     labs(x = 'Time (days)',
-          y = 'Relative frequency',
+     labs(x = '',
+          y = '',
           colour = '',
-          title = 'c')+
+          title = 'b')+
      guides(color = 'none')
 
 fig_gt <- fig_gt + 
@@ -751,13 +752,13 @@ fig_reff <- ggplot(data = datafile,
                vjust = -1,
                hjust = -0.1
      )+
-     annotate(geom = 'text',
-              x = 5,
-              y = Inf,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Effective reproductive number')+
+     # annotate(geom = 'text',
+     #          x = 5,
+     #          y = Inf,
+     #          vjust = -0.7,
+     #          size = 11*5/14,
+     #          family = 'Helvetica',
+     #          label = 'Effective reproductive number')+
      coord_cartesian(clip = "off")+
      scale_fill_manual(values = fill_color,
                        breaks = datafile$variant)+
