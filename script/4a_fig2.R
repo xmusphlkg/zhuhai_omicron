@@ -2,8 +2,6 @@
 # packages ----------------------------------------------------------------
 
 library(tidyverse)
-library(ggrepel)
-library(ggraph)
 library(cowplot)
 library(patchwork)
 library(ggsci)
@@ -16,338 +14,195 @@ font_add('Helvetica',
 
 remove(list = ls())
 
-fill_color <- c(alpha("#BC3C29FF", 0.3), "#BC3C29FF", 
-                alpha("#E18727FF", 0.3), "#E18727FF",
-                alpha("#20854EFF", 0.3), "#20854EFF" 
-                )
+fill_color <- pal_nejm()(8)[c(1, 3:4)]
 fill_color_1 <- pal_nejm()(8)[c(2, 5:8)]
 
 load('./data/sars_2_cov.Rdata')
 
+# BA2 ---------------------------------------------------------------------
 
-# infections vaccine and age ----------------------------------------------
+datafile_gannt <- datafile_info_BA2 |> 
+     select(id, dateexpose1, dateexpose2, dateonset, datepositive, datereported) |> 
+     mutate(index = sprintf('%02d', id))
 
-datafile_info_BA1$lineage <- 'BA1'
-datafile_info_BA2$lineage <- 'BA2'
-datafile_info_BA2$location1 <- '厦门'
-datafile_info_BA2$location2 <- '厦门'
-datafile_info_Delta$lineage <- 'Delta'
+datafile_gannt_plot <- datafile_gannt[rep(datafile_gannt$id, 4), c('id', 'index')] |> 
+     mutate(start_date = as.Date(unlist(datafile_gannt[,2:5]), origin = as.Date("1970-01-01")),
+            end_date = as.Date(unlist(datafile_gannt[,3:6]), origin = as.Date("1970-01-01")),
+            type = rep(c("A", "B", "C", "D"), each = nrow(datafile_gannt)),
+            just = if_else(start_date == end_date,
+                            0.1,
+                            0)) |> 
+     arrange(index) |> 
+     group_by(index) |> 
+     mutate(index = fct_inorder(index))
 
-datafile_info <- rbind(datafile_info_Delta,
-                       datafile_info_BA1,
-                       mutate(datafile_info_BA2, gender = NA))|> 
-     select(age, vaccine, vaccine_type, lineage) |> 
-     mutate(age_g = if_else(age <=18, 'c', 'a'),
-            age_g = if_else(age >=65, 'o', age_g),
-            age_g = factor(age_g, 
-                           levels = c('c', 'a', 'o')),
-            vaccine_mix = case_when(
-                 is.na(vaccine_type) ~ 'U',
-                 vaccine_type == "Combind" ~ 'M',
-                 vaccine_type != "Combind" ~ 'U',
-                 TRUE ~ as.character(vaccine_type)
-            ),
-            vaccine = factor(vaccine, 
-                             levels = c(3, 2, 1, 0),
-                             labels = c('A', 'B', 'C', 'C')))
+y_labels <- paste('Case', datafile_gannt$index)
+names(y_labels) <- as.character(datafile_gannt$index)
 
-datafile_percent <- datafile_info |> 
-     group_by(age_g, lineage, vaccine, vaccine_mix) |> 
-     count() |> 
-     ungroup() |> 
-     mutate(group = paste(vaccine, vaccine_mix, sep = "_"),
-            group = factor(group,
-                           levels = c("C_U", "C_M", "B_U", "B_M", "A_U", "A_M")))
+fig_a <- ggplot(data = datafile_gannt_plot)+
+     geom_linerange(mapping = aes(y = index,
+                                  xmin = start_date,
+                                  xmax = end_date),
+                    colour = '#C8C8C8FF',
+                    size = 4,
+                    show.legend = F)+
+     geom_point(mapping = aes(y = index,
+                              x = start_date-just,
+                              colour = type),
+                size = 6)+
+     geom_point(data = filter(datafile_gannt_plot, type == 'D'),
+                mapping = aes(y = index,
+                              x = end_date,
+                              colour = 'E'),
+                size = 6)+
+     # coord_fixed(ratio = 0.95)+
+     scale_colour_manual(values = fill_color_1,
+                         labels = c("First Exposed",
+                                    "Last Exposed",
+                                    "Onset",
+                                    "Positive testing",
+                                    "Report"))+
+     scale_y_discrete(labels = y_labels)+
+     scale_x_date(expand = c(0,1),
+                  limits = c(as.Date('2022/3/7'), as.Date('2022/4/10')),
+                  date_breaks = '2 days',
+                  date_labels = '%Y-%m-%d')+
+     labs(title = 'a',
+          y = "",
+          x = 'Date',
+          colour = 'Date')
 
-datafile_total <- datafile_info |> 
-     group_by(age_g, lineage) |> 
-     count()
+# BA1 ---------------------------------------------------------------------
 
-datafile_label <- data.frame(x = rep(1, 3),
-                             y = rep('a', 3),
-                             label = rep('Number of infections', 3),
-                             lineage = c('BA2', 'BA1', 'Delta'))
+datafile_gannt <- datafile_info_BA1 |> 
+     select(id, dateexpose1, dateexpose2, dateonset, datepositive, datereported) |> 
+     mutate(index = sprintf('%02d', id))
 
+datafile_gannt_plot <- datafile_gannt[rep(datafile_gannt$id, 4), c('id', 'index')] |> 
+     mutate(start_date = as.Date(unlist(datafile_gannt[,2:5]), origin = as.Date("1970-01-01")),
+            end_date = as.Date(unlist(datafile_gannt[,3:6]), origin = as.Date("1970-01-01")),
+            type = rep(c("A", "B", "C", "D"), each = nrow(datafile_gannt)),
+            just = if_else(start_date == end_date,
+                           0.1,
+                           0)) |> 
+     arrange(index) |> 
+     group_by(index) |> 
+     mutate(index = fct_inorder(index))
 
-# infections plot ---------------------------------------------------------
+y_labels <- paste('Case', datafile_gannt$index)
+names(y_labels) <- as.character(datafile_gannt$index)
 
-fig_inf <- ggplot(datafile_percent)+
-     geom_bar(mapping = aes(y = age_g,
-                            x = n, 
-                            fill = group),
-              color = 'black',
-              stat="identity",
-              position = position_fill(reverse = T),
-              show.legend = T)+
-     geom_text(data = filter(datafile_total),
-               mapping = aes(x = 1,
-                             y = age_g,
-                             label = n),
-               vjust = -0.2,
-               angle = -90,
-               family = 'Helvetica')+
-     geom_text(data = datafile_label,
-               mapping = aes(x = x,
-                             y = y,
-                             label = label),
-               vjust = -2,
-               angle = -90,
-               family = 'Helvetica')+
-     facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))), 
-                ncol = 1,
-                scales = 'free_x',
-                labeller = as_labeller(c(
-                      Delta = 'e',
-                      BA1 = 'c',
-                      BA2 = 'a'
-                )))+
-     scale_y_discrete(labels = c('0-18', '19-64', '65-'),
-                      expand = c(0, 0.6),
-                      breaks = c('c', 'a', 'o'))+
-     scale_x_continuous(n.breaks = 6,
-                        expand =  expansion(add = c(0, 0)))+
-     scale_fill_manual(values = fill_color,
-                       labels = c('Unfully Vaccinated & Unmixed', 
-                                  'Unfully Vaccinated & Mixed',
-                                  'Fully Vaccinated & Unmixed',
-                                  'Fully Vaccinated & Mixed', 
-                                  'Booster Dose & Unmixed', 
-                                  'Booster Dose & Mixed'
-                                  ),
-                       na.translate = F)+
-     coord_cartesian(clip = "off")+
-     theme_classic(base_family = 'Helvetica')+
-     labs(y = "",
-          x = 'Proportions',
-          fill = 'Vaccination status')
+fig_b <- ggplot(data = datafile_gannt_plot)+
+     geom_linerange(mapping = aes(y = index,
+                                  xmin = start_date,
+                                  xmax = end_date),
+                    colour = '#C8C8C8FF',
+                    size = 4,
+                    show.legend = F)+
+     geom_point(mapping = aes(y = index,
+                              x = start_date-just,
+                              colour = type),
+                size = 6)+
+     geom_point(data = filter(datafile_gannt_plot, type == 'D'),
+                mapping = aes(y = index,
+                              x = end_date,
+                              colour = 'E'),
+                size = 6)+
+     # coord_fixed(ratio = 0.95)+
+     scale_colour_manual(values = fill_color_1,
+                         labels = c("First Exposed",
+                                    "Last Exposed",
+                                    "Onset",
+                                    "Positive testing",
+                                    "Report"))+
+     scale_y_discrete(labels = y_labels)+
+     scale_x_date(expand = c(0,1),
+                  limits = c(as.Date('2022/1/4'), as.Date('2022/2/7')),
+                  date_breaks = '2 days',
+                  date_labels = '%Y-%m-%d')+
+     labs(title = 'b',
+          y = "",
+          x = 'Date',
+          colour = 'Date')+
+     guides(colour = 'none')
+# delta ---------------------------------------------------------------------
 
-# contacts vaccine and age ------------------------------------------------
+datafile_gannt <- datafile_info_Delta |> 
+     select(id, dateexpose1, dateexpose2, dateonset, datepositive, datereported) |> 
+     mutate(index = sprintf('%03d', id))
 
-datafile_cont_BA1$lineage <- 'BA1'
-datafile_cont_BA2$lineage <- 'BA2'
-datafile_cont_Delta$lineage <- 'Delta'
+datafile_gannt_plot <- datafile_gannt[rep(datafile_gannt$id, 4), c('id', 'index')] |> 
+     mutate(start_date = as.Date(unlist(datafile_gannt[,2:5]), origin = as.Date("1970-01-01")),
+            end_date = as.Date(unlist(datafile_gannt[,3:6]), origin = as.Date("1970-01-01")),
+            type = rep(c("A", "B", "C", "D"), each = nrow(datafile_gannt)),
+            just = if_else(start_date == end_date,
+                           0.1,
+                           0)) |> 
+     arrange(index) |> 
+     group_by(index) |> 
+     mutate(index = fct_inorder(index))
 
-datafile_cont <- rbind(datafile_cont_Delta,
-                       datafile_cont_BA1,
-                       mutate(datafile_cont_BA2, gender = NA))|> 
-     select(age, vaccine, vaccine_mix, lineage) |> 
-     mutate(age_g = if_else(age <=18, 'c', 'a'),
-            age_g = if_else(age >=65, 'o', age_g),
-            age_g = factor(age_g, levels = c('c', 'a', 'o')),
-            vaccine_mix = if_else(is.na(vaccine_mix), 
-                                  'N', 
-                                  vaccine_mix)) |> 
-     mutate(vaccine = factor(vaccine, 
-                             levels = c(3, 2, 1, 0),
-                             labels = c('A', 'B', 'C', 'C')),
-            vaccine_mix = if_else(vaccine_mix == 'Y', 'M', 'U'))
+y_labels <- paste('Case', datafile_gannt$index)
+names(y_labels) <- as.character(datafile_gannt$index)
 
-datafile_percent <- datafile_cont |> 
-     group_by(age_g, lineage, vaccine, vaccine_mix) |> 
-     count() |> 
-     filter(!is.na(age_g)) |> 
-     ungroup() |> 
-     mutate(group = paste(vaccine, vaccine_mix, sep = "_"),
-            group = factor(group,
-                           levels = c("C_U", "C_M", "B_U", "B_M", "A_U", "A_M")))
-
-datafile_total <- datafile_cont |> 
-     group_by(age_g, lineage) |> 
-     count() |> 
-     filter(!is.na(age_g))
-
-datafile_label <- data.frame(x = rep(1, 3),
-                             y = rep('a', 3),
-                             label = rep('Number of contacts', 3),
-                             lineage = c('BA2', 'BA1', 'Delta'))
-
-# contacts ----------------------------------------------------------------
-
-fig_cont <- ggplot(datafile_percent)+
-     geom_bar(mapping = aes(y = age_g,
-                            x = n, 
-                            fill = group),
-              color = 'black',
-              stat="identity",
-              position = position_fill(reverse = T),
-              show.legend = T)+
-     geom_text(data = filter(datafile_total),
-               mapping = aes(x = 1,
-                             y = age_g,
-                             label = n),
-               vjust = -0.2,
-               angle = -90,
-               family = 'Helvetica')+
-     geom_text(data = datafile_label,
-               mapping = aes(x = x,
-                             y = y,
-                             label = label),
-               vjust = -2,
-               angle = -90,
-               family = 'Helvetica')+
-     facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))), 
-                ncol = 1,
-                scales = 'free_x',
-                labeller = as_labeller(c(
-                     Delta = 'f',
-                     BA1 = 'd',
-                     BA2 = 'b'
-                )))+
-     scale_y_discrete(labels = c('0-18', '19-64', '65-'),
-                      expand = c(0, 0.6),
-                      breaks = c('c', 'a', 'o'))+
-     scale_x_continuous(n.breaks = 6,
-                        expand =  expansion(add = c(0, 0)))+
-     scale_fill_manual(values = fill_color,
-                       labels = c('Unfully Vaccinated & Unmixed', 
-                                  'Unfully Vaccinated & Mixed',
-                                  'Fully Vaccinated & Unmixed',
-                                  'Fully Vaccinated & Mixed', 
-                                  'Booster Dose & Unmixed', 
-                                  'Booster Dose & Mixed'
-                       ),
-                       na.translate = F)+
-     coord_cartesian(clip = "off")+
-     theme_classic(base_family = 'Helvetica')+
-     labs(y = "",
-          x = 'Proportions',
-          fill = 'Vaccination status')
-
-# combined plot ------------------------------------------------------------
-
-fig_1 <- fig_inf + fig_cont +
-     plot_layout(guides = 'collect')&
-     theme(plot.title = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
-           plot.margin = margin(0, 1, 0, 0, "cm"),
-           axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
-           strip.text = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
-           strip.background = element_blank(),
-           panel.grid.major = element_blank(),
-           panel.grid.minor = element_blank(),
-           legend.position = 'bottom')
-
-fig_1
-
-# vaccine manufacturer ----------------------------------------------------
-
-datafile_cont <- rbind(datafile_cont_Delta,
-                       datafile_cont_BA1,
-                       mutate(datafile_cont_BA2, gender = NA))|> 
-        select(age, vaccine, vaccine_type, vaccine_mix, lineage) |> 
-        mutate(age_g = if_else(age <=18, 'c', 'a'),
-               age_g = if_else(age >=65, 'o', age_g),
-               age_g = factor(age_g, levels = c('c', 'a', 'o')),
-               vaccine_mix = if_else(is.na(vaccine_mix), 
-                                     'N', 
-                                     vaccine_mix)) |> 
-        mutate(vaccine = factor(vaccine, 
-                                levels = 0:3,
-                                labels = c('C', 'C', 'B', 'A')),
-               vaccine_mix = if_else(vaccine_mix == 'Y', 'M', 'U'),
-               vaccine_g = str_remove_all(vaccine_type, '[_]'),
-               vaccine_g = sapply(vaccine_g, FUN = function(x){
-                       paste(sort(unique(strsplit(x, "")[[1]])), collapse = '')
-               })) |> 
-        group_by(vaccine, vaccine_g, lineage) |> 
-        count() |> 
-        ungroup() |> 
-        filter(vaccine_g != "")
-
-datafile_cont_back <- datafile_cont |> 
-        group_by(lineage, vaccine) |> 
-        summarise(n = sum(n),
-                  .groups = 'drop')
-
-# datafile_cont_top <- datafile_cont |>
-#         arrange(desc(n)) |>
-#         group_by(lineage, vaccine) |>
-#         slice(1:3)
-datafile_cont_top <- datafile_cont |> 
-        group_by(lineage, vaccine) |> 
-        filter(vaccine_g %in% c('P', 'V', 'C', 'PV')) |> 
-        select(vaccine, vaccine_g, lineage, n)
-
-datafile_cout_sum <- datafile_cont_top |> 
-        summarise(n = sum(n),
-                  .groups = 'drop') |> 
-        left_join(datafile_cont_back,
-                  by = c("lineage", "vaccine")) |> 
-        mutate(n = n.y - n.x,
-               vaccine_g = 'Other') |> 
-        select(lineage, vaccine, vaccine_g, n) |> 
-        rbind(datafile_cont_top) |> 
-        mutate(vaccine_g = if_else(vaccine_g == "",
-                                   'Unvaccine',
-                                   vaccine_g),
-               vaccine_g = factor(vaccine_g,
-                                  levels = c('P', 'V', 'C', 'PV', 'Other', 'Unvaccine')))
-
-# plot --------------------------------------------------------------------
-
-datafile_label <- data.frame(x = rep('B', 3),
-                             y = rep(2500, 3),
-                             label = c('Omicron BA.2 outbreak',
-                                       'Omicron BA.1 outbreak',
-                                       'Delta outbreak'),
-                             lineage = c('BA2', 'BA1', 'Delta'))
-
-fig_2 <- ggplot(data = datafile_cout_sum)+
-        geom_col(mapping = aes(x = vaccine,
-                               y = n, 
-                               fill = vaccine_g),
-                 color = 'black',
-                 position = position_dodge2(width = 0.9, preserve = "single"),
-                 show.legend = T)+
-        geom_text(data = filter(datafile_label),
-                  mapping = aes(x = x,
-                                y = y,
-                                label = label),
-                  vjust = -0.2,
-                  family = 'Helvetica')+
-        facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))),
-                   nrow = 1,
-                   scales = 'free_y',
-                   labeller = as_labeller(c(
-                           Delta = 'i',
-                           BA1 = 'h',
-                           BA2 = 'g'
-                   )))+
-        scale_x_discrete(labels = c('Unfully Vaccinated', 'Fully Vaccinated', 'Booster Dose'),
-                         expand = c(0, 0.6),
-                         breaks = c('C', 'B', 'A'))+
-        scale_y_continuous(limits = c(0, 2500),
-                           expand = c(0, 0))+
-        scale_fill_manual(values = fill_color_1,
-                          labels = c('Sinopharm',
-                                     'Sinovac',
-                                     'Cansino',
-                                     'Sinopharm & Sinovac',
-                                     'Other',
-                                     'Unvaccined'),
-                          na.translate = F)+
-        coord_cartesian(clip = "off")+
-        theme_classic(base_family = 'Helvetica')+
-        theme(plot.title = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
-              plot.margin = margin(0, 1, 0, 0.25, "cm"),
-              axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-              axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-              axis.title.y = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
-              strip.text = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
-              strip.background = element_blank(),
-              panel.grid.major = element_blank(),
-              panel.grid.minor = element_blank(),
-              legend.position = 'bottom')+
-        labs(y = "Contacts",
-             x = '',
-             fill = 'Manufacturer')
+fig_c <- ggplot(data = datafile_gannt_plot)+
+     geom_linerange(mapping = aes(y = index,
+                                  xmin = start_date,
+                                  xmax = end_date),
+                    colour = '#C8C8C8FF',
+                    size = 4,
+                    show.legend = F)+
+     geom_point(mapping = aes(y = index,
+                              x = start_date-just,
+                              colour = type),
+                size = 6)+
+     geom_point(data = filter(datafile_gannt_plot, type == 'D'),
+                mapping = aes(y = index,
+                              x = end_date,
+                              colour = 'E'),
+                size = 6)+
+     # coord_fixed(ratio = 0.95)+
+     scale_colour_manual(values = fill_color_1,
+                         labels = c("First Exposed",
+                                    "Last Exposed",
+                                    "Onset",
+                                    "Positive testing",
+                                    "Report"))+
+     scale_y_discrete(labels = y_labels)+
+     scale_x_date(expand = c(0,1),
+                  limits = c(as.Date('2021/7/14'), as.Date('2021/8/17')),
+                  date_breaks = '2 days',
+                  date_labels = '%Y-%m-%d')+
+     labs(title = 'c',
+          y = "",
+          x = 'Date',
+          colour = 'Date')+
+     guides(colour = 'none')
 
 # combined plot -----------------------------------------------------------
 
-cowplot::plot_grid(fig_1, fig_2, 
-                   ncol = 1,
-                   rel_heights = c(1.75, 1))
+design <- "
+AACC
+BBCC
+"
 
-ggsave(filename = './outcome/publish/Figure 2.pdf',
-       width = 14, height = 11)
+fig_a + fig_b + fig_c +
+     plot_layout(design = design)&
+     theme_bw(base_family = 'Helvetica')+
+     theme(plot.title = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+           plot.margin = margin(0, 0.5, 0, 0, "cm"),
+           axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', angle = 45, color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 0, vjust = .5, face = 'plain', color = 'black'),
+           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
+           legend.position = 'bottom',
+           strip.text = element_blank(),
+           strip.placement = "outside",
+           strip.background = element_blank(),
+           panel.grid.major.y = element_blank(),
+           panel.spacing.y = unit(0, 'mm'),
+           text = element_text(size = 12),
+           axis.title.y = element_text(size = 12, face = 'bold'))
+
+ggsave('./outcome/publish/Figure 2.pdf',
+       height = 18,
+       width = 14)

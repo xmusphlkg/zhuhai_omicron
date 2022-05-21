@@ -2,485 +2,795 @@
 # packages ----------------------------------------------------------------
 
 library(tidyverse)
-library(RColorBrewer)
 library(patchwork)
+library(scales)
+library(openxlsx)
 library(ggsci)
-library(ggpubr)
-library(survival)
-
-remove(list = ls())
-
-load('./data/sars_2_cov.Rdata')
 
 library(showtext)
 font_add('Helvetica', 
          "./script/fonts/Helvetica.ttf",
          bold = "./script/fonts/Helvetica-Bold.ttf")
 
-fill_color <- rev(pal_nejm()(4))[-3]
-fill_color_1 <- c('#F1EB58FF', '#AA812DFF', '#283F99FF')
+remove(list = ls())
 
-# Ct value ----------------------------------------------------------------
+load('data/sars_2_cov.Rdata')
 
-datafile_info <- rbind(mutate(datafile_info_Delta, 
-                              lineage = 'Delta'),
-                       mutate(datafile_info_BA2, 
-                              lineage = 'BA.2', 
-                              location1 = '厦门',
-                              location2 = '厦门'),
-                       mutate(datafile_info_BA1, 
-                              lineage = 'BA.1')) |> 
-     mutate(vaccine = factor(vaccine, 
-                             levels = c(3, 2, 1, 0),
-                             labels = c('A', 'B', 'C', 'C')),
-            vaccine = factor(vaccine, levels = c('C', 'B', 'A')),
-            lineage = factor(lineage,
-                             levels = c('Delta', 'BA.1', 'BA.2')),
-            tag = '')
+set.seed(202202)
 
+# function ----------------------------------------------------------------
 
-datafile_info_ci <- datafile_info |> 
-     group_by(vaccine, lineage) |> 
-     summarise(Throat_N_median = median(Throat_N, na.rm = T),
-               Throat_N_q1 = quantile(Throat_N, 0.25, na.rm = T),
-               Throat_N_q3 = quantile(Throat_N, 0.75, na.rm = T),
-               Throat_O_median = median(Throat_O, na.rm = T),
-               Throat_O_q1 = quantile(Throat_O, 0.25, na.rm = T),
-               Throat_O_q3 = quantile(Throat_O, 0.75, na.rm = T),
-               .groups = 'drop')
+library(epitrix)
 
-
-# plot --------------------------------------------------------------------
-
-fig_ct_voc_n <- ggplot(datafile_info,
-                     mapping = aes(x = lineage,
-                                   y = Throat_N,
-                                   fill = lineage)) +
-     geom_boxplot(alpha = 0.3,
-                  show.legend = F)+
-     geom_boxplot(aes(color = lineage),
-                  fatten = NULL, fill = NA, coef = 0, outlier.alpha = 0.3,
-                  show.legend = F)+
-     geom_jitter(aes(color = lineage),
-                 alpha = 0.3,
-                 na.rm = T,
-                 width = 0.2,
-                 height = 0,
-                 show.legend = F) +
-     scale_x_discrete(expand = c(0, 0.6),
-                      breaks = c('Delta', 'BA.1', 'BA.2'))+
-     scale_y_continuous(limits = c(10, 45),
-                        expand = c(0, 0))+
-     scale_fill_manual(values = fill_color,
-                       na.translate = F)+
-     scale_color_manual(values = fill_color,
-                        na.translate = F)+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = '',
-          y = '',
-          title = 'b')
-
-fig_ct_vaccine_n <- ggplot(datafile_info,
-                     mapping = aes(x = vaccine,
-                                   y = Throat_N,
-                                   fill = vaccine)) +
-     geom_boxplot(alpha = 0.3,
-                  show.legend = F)+
-     geom_boxplot(aes(color = vaccine),
-                  fatten = NULL, fill = NA, coef = 0, outlier.alpha = 0.3,
-                  show.legend = F)+
-     geom_jitter(aes(color = vaccine),
-                 alpha = 0.3,
-                 na.rm = T,
-                 width = 0.2,
-                 height = 0,
-                 show.legend = F) +
-     scale_x_discrete(expand = c(0, 0.6),
-                      breaks = c('C', 'B', 'A'),
-                      labels = c('Unfully\nVaccinated', 
-                                 'Fully\nVaccinated', 
-                                 'Booster\nDose'))+
-     scale_y_continuous(limits = c(10, 45),
-                        expand = c(0, 0))+
-     scale_fill_manual(values = fill_color_1,
-                       na.translate = F)+
-     scale_color_manual(values = fill_color_1,
-                        na.translate = F)+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = '',
-          y = 'N gene Ct value',
-          title = 'a')
-
-fig_ct_voc_o <- ggplot(datafile_info,
-                       mapping = aes(x = lineage,
-                                     y = Throat_O,
-                                     fill = lineage)) +
-     geom_boxplot(alpha = 0.3,
-                  show.legend = F)+
-     geom_boxplot(aes(color = lineage),
-                  fatten = NULL, fill = NA, coef = 0, outlier.alpha = 0.3,
-                  show.legend = F)+
-     geom_jitter(aes(color = lineage),
-                 alpha = 0.3,
-                 na.rm = T,
-                 width = 0.2,
-                 height = 0,
-                 show.legend = F) +
-     scale_x_discrete(expand = c(0, 0.6),
-                      breaks = c('Delta', 'BA.1', 'BA.2'))+
-     scale_y_continuous(limits = c(10, 45),
-                        expand = c(0, 0))+
-     scale_fill_manual(values = fill_color,
-                       na.translate = F)+
-     scale_color_manual(values = fill_color,
-                        na.translate = F)+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = '',
-          y = '',
-          title = 'd')
-
-fig_ct_vaccine_o <- ggplot(datafile_info,
-                           mapping = aes(x = vaccine,
-                                         y = Throat_O,
-                                         fill = vaccine)) +
-     geom_boxplot(alpha = 0.3,
-                  show.legend = F)+
-     geom_boxplot(aes(color = vaccine),
-                  fatten = NULL, fill = NA, coef = 0, outlier.alpha = 0.3,
-                  show.legend = F)+
-     geom_jitter(aes(color = vaccine),
-                 alpha = 0.3,
-                 na.rm = T,
-                 width = 0.2,
-                 height = 0,
-                 show.legend = F) +
-     scale_x_discrete(expand = c(0, 0.6),
-                      breaks = c('C', 'B', 'A'),
-                      labels = c('Unfully\nVaccinated', 
-                                 'Fully\nVaccinated', 
-                                 'Booster\nDose'))+
-     scale_y_continuous(limits = c(10, 45),
-                        expand = c(0, 0))+
-     scale_fill_manual(values = fill_color_1,
-                       na.translate = F)+
-     scale_color_manual(values = fill_color_1,
-                        na.translate = F)+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = '',
-          y = 'ORF gene Ct value',
-          title = 'c')
-
-
-fig_ct_n <- ggplot(datafile_info,
-                   mapping = aes(x = lineage,
-                                 y = Throat_N,
-                                 fill = lineage)) +
-     geom_boxplot(alpha = 0.3,
-                  show.legend = F)+
-     geom_boxplot(aes(color = lineage),
-                  fatten = NULL, fill = NA, coef = 0, outlier.alpha = 0.3,
-                  show.legend = F)+
-     geom_jitter(aes(color = lineage),
-                 alpha = 0.3,
-                 na.rm = T,
-                 width = 0.2,
-                 height = 0,
-                 show.legend = F) +
-     scale_x_discrete(expand = c(0, 0.6),
-                      breaks = c('Delta', 'BA.1', 'BA.2'))+
-     scale_y_continuous(limits = c(10, 45),
-                        expand = c(0, 0))+
-     scale_fill_manual(values = fill_color,
-                       na.translate = F)+
-     scale_color_manual(values = fill_color,
-                        na.translate = F)+
-     theme_classic(base_family = 'Helvetica')+
-     theme(plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
-           plot.margin = margin(0, 0.2, 0, 0, "cm"),
-           axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
-           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
-           strip.text.x = element_text(size = 12, face = 'bold'),
-           strip.text.y = element_text(size = 12, face = 'bold'),
-           strip.placement = "outside",
-           strip.background = element_rect(color = NA),
-           panel.spacing.x = unit(0, 'mm'))+
-     facet_grid(. ~ factor(vaccine, levels = c('C', 'B', 'A')),
-                switch = 'both',
-                labeller = as_labeller(c('C' = 'Unfully Vaccinated',
-                                         'B' = 'Fully Vaccinated',
-                                         'A' = 'Booster Dose')))+
-     labs(x = '',
-          y = 'N gene Ct value',
-          title = 'e')
-
-fig_ct_o <- ggplot(datafile_info,
-                   mapping = aes(x = lineage,
-                                 y = Throat_O,
-                                 fill = lineage)) +
-     geom_boxplot(alpha = 0.3,
-                  show.legend = F)+
-     geom_boxplot(aes(color = lineage),
-                  fatten = NULL, fill = NA, coef = 0, outlier.alpha = 0.3,
-                  show.legend = F)+
-     geom_jitter(aes(color = lineage),
-                 alpha = 0.3,
-                 na.rm = T,
-                 width = 0.2,
-                 height = 0,
-                 show.legend = F) +
-     scale_x_discrete(expand = c(0, 0.6),
-                      breaks = c('Delta', 'BA.1', 'BA.2'))+
-     scale_y_continuous(limits = c(10, 45),
-                        expand = c(0, 0))+
-     scale_fill_manual(values = fill_color,
-                       na.translate = F)+
-     scale_color_manual(values = fill_color,
-                        na.translate = F)+
-     theme_classic(base_family = 'Helvetica')+
-     theme(plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
-           plot.margin = margin(0, 0.2, 0, 0, "cm"),
-           axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
-           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
-           strip.text.x = element_text(size = 12, face = 'bold'),
-           strip.text.y = element_text(size = 12, face = 'bold'),
-           strip.placement = "outside",
-           strip.background = element_rect(color = NA),
-           panel.spacing.x = unit(0, 'mm'))+
-     facet_grid(. ~ factor(vaccine, levels = c('C', 'B', 'A')),
-                switch = 'both',
-                labeller = as_labeller(c('C' = 'Unfully Vaccinated',
-                                         'B' = 'Fully Vaccinated',
-                                         'A' = 'Booster Dose')))+
-     labs(x = '',
-          y = 'ORF gene Ct value',
-          title = 'f')
-
-# logistics regression ----------------------------------------------------
-
-datafile_cont_BA1$lineage <- 'BA1'
-datafile_cont_BA2$lineage <- 'BA2'
-datafile_cont_Delta$lineage <- 'Delta'
-
-datafile_cont <- rbind(datafile_cont_Delta,
-                       datafile_cont_BA1,
-                       mutate(datafile_cont_BA2, gender = NA))|> 
-        select(age, vaccine, vaccine_mix, lineage, outcome, 
-               vaccinelastdate, lastexposedate) |> 
-        mutate(age_g = if_else(age <=18, 'c', 'a'),
-               age_g = if_else(age >=65, 'o', age_g),
-               age_g = factor(age_g, levels = c('c', 'a', 'o')),
-               vaccine_mix = if_else(is.na(vaccine_mix), 
-                                     'N', 
-                                     vaccine_mix),
-               dateseq = lastexposedate - vaccinelastdate,
-               dateseq_g = if_else(dateseq <= 120,
-                                   1,
-                                   0)) |> 
-        mutate(vaccine = if_else(vaccine == 0,
-                                 0,
-                                 vaccine - 1),
-               vaccine_mix = if_else(vaccine_mix == 'Y', 1, 0),
-               vaccine_g = case_when(
-                       vaccine == 0 ~ 0,
-                       vaccine == 1 & vaccine_mix ==0 ~ 1,
-                       vaccine == 1 & vaccine_mix ==1 ~ 3,
-                       vaccine == 2 & vaccine_mix ==0 ~ 2,
-                       vaccine == 2 & vaccine_mix ==1 ~ 4,
-                       TRUE ~ as.numeric(vaccine)
-               ),
-               vaccine_g = as.factor(vaccine_g))
-
-res_clog_delta <- clogit(formula = outcome ~ vaccine_g  + strata(age), 
-                         data = filter(datafile_cont, lineage == 'Delta')) |> 
-        summary() %>%
-        .[["conf.int"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'Delta') |> 
-        select(-`exp(-coef)`) |> 
-        rownames_to_column('var')
-res_clog_ba1 <- clogit(formula = outcome ~ vaccine_g  + strata(age), 
-                       data = filter(datafile_cont, lineage == 'BA1')) |> 
-        summary() %>%
-        .[["conf.int"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'BA1') |> 
-        select(-`exp(-coef)`) |> 
-        rownames_to_column('var')
-res_clog_ba2 <- clogit(formula = outcome ~ vaccine_g  + strata(age), 
-                       data = filter(datafile_cont, lineage == 'BA2')) |> 
-        summary() %>%
-        .[["conf.int"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'BA2') |> 
-        select(-`exp(-coef)`) |> 
-        rownames_to_column('var')
-
-datafile_res_adjust <- rbind(res_clog_delta,
-                      res_clog_ba1,
-                      res_clog_ba2)
-names(datafile_res_adjust)[2:4] <- c('OR', 'OR_1', 'OR_2')
-
-res_log_delta <- glm(formula = outcome ~ vaccine_g  + factor(age), 
-                      data = filter(datafile_cont, lineage == 'Delta'),
-                      family = binomial(link = "logit")) |> 
-        summary() %>%
-        .[["coefficients"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'Delta') |> 
-        rownames_to_column('var')
-res_log_ba1 <- glm(formula = outcome ~ vaccine_g  + factor(age), 
-                    data = filter(datafile_cont, lineage == 'BA1'),
-                    family = binomial(link = "logit")) |> 
-        summary() %>%
-        .[["coefficients"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'BA1') |> 
-        rownames_to_column('var')
-res_log_ba2 <- glm(formula = outcome ~ vaccine_g  + factor(age), 
-                    data = filter(datafile_cont, lineage == 'BA2'),
-                    family = binomial(link = "logit")) |> 
-        summary() %>%
-        .[["coefficients"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'BA2') |> 
-        rownames_to_column('var')
-
-datafile_res_unadjust <- rbind(res_log_delta,
-                             res_log_ba1,
-                             res_log_ba2)
-datafile_res_unadjust <- datafile_res_unadjust[-grep('age|Intercept', datafile_res_unadjust$var),] |> 
-        select(var, lineage, Estimate, `Std. Error`) |> 
-        mutate(OR = exp(Estimate),
-               OR_1 = exp(Estimate - 1.96*`Std. Error`),
-               OR_2 = exp(Estimate + 1.96*`Std. Error`)) |> 
-        select(var, OR, OR_1, OR_2, lineage)
-
-# plot --------------------------------------------------------------------
-
-datafile_res_adjust$just <- 'Age'
-datafile_res_unadjust$just <- 'No'
-datafile_res <- rbind(datafile_res_adjust, datafile_res_unadjust) |> 
-        mutate(var = factor(var,
-                            levels = c(paste0('vaccine_g', 1:4))),
-               lineage = factor(lineage,
-                                levels = c('Delta', 'BA1', 'BA2'))) |> 
-        filter(!is.na(OR_1)&OR_1>0)
-
-fig_log_unjust <- ggplot(data = filter(datafile_res, just == 'No'),
-                         mapping = aes(x = lineage,
-                                       y = OR,
-                                       color = lineage))+
-        geom_point()+
-        geom_pointrange(mapping = aes(ymin = OR_1, 
-                                      ymax = OR_2))+
-        geom_hline(yintercept = 1,
-                   linetype = 'dashed',
-                   color = 'black')+
-        facet_grid(cols = vars(var),
-                   switch = 'both',
-                   labeller = as_labeller(c('vaccine_g1' = 'Fully & Unmixed',
-                                            'vaccine_g2' = 'Booster & Unmixed',
-                                            'vaccine_g3' = 'Fully & Mixed',
-                                            'vaccine_g4' = 'Booster & Mixed')))+
-        scale_x_discrete(expand = c(0, 0.6))+
-        scale_y_continuous(limits = c(0, 10),
-                           breaks = seq(0, 10, 2),
-                           expand = c(0, 0))+
-        scale_color_manual(values = fill_color,
-                           labels = c('Delta', 'BA.1', 'BA.2'),
-                           na.translate = F)+
-        theme_classic(base_family = 'Helvetica')+
-        labs(x = '',
-             y = 'Odds ratio',
-             title = 'g',
-             color = 'VOC')
-
-fig_log_just <- ggplot(data = filter(datafile_res, just == 'Age'),
-                         mapping = aes(x = lineage,
-                                       y = OR,
-                                       color = lineage))+
-        geom_point()+
-        geom_pointrange(mapping = aes(ymin = OR_1, 
-                                      ymax = OR_2))+
-        geom_hline(yintercept = 1,
-                   linetype = 'dashed',
-                   color = 'black')+
-        facet_grid(cols = vars(var),
-                   switch = 'both',
-                   labeller = as_labeller(c('vaccine_g1' = 'Fully & Unmixed',
-                                            'vaccine_g2' = 'Booster & Unmixed',
-                                            'vaccine_g3' = 'Fully & Mixed',
-                                            'vaccine_g4' = 'Booster & Mixed')))+
-        scale_x_discrete(expand = c(0, 0.6))+
-        scale_y_continuous(limits = c(0, 10),
-                           breaks = seq(0, 10, 2),
-                           expand = c(0, 0))+
-        scale_color_manual(values = fill_color,
-                           labels = c('Delta', 'BA.1', 'BA.2'),
-                           na.translate = F)+
-        theme_classic(base_family = 'Helvetica')+
-        labs(x = '',
-             y = 'Adjusted odds ratio',
-             title = 'h',
-             color = 'VOC')
-
-
-# combined -----------------------------------------------------------------
-
-gg_ct_o <- ggplotGrob(fig_ct_o)
-gg_ct_n <- ggplotGrob(fig_ct_n)
-
-for (i in 1:3) {
-     grob.i <- grep("strip-b", gg_ct_n$layout$name)[i]
-     gg_ct_n$grobs[[grob.i]]$grobs[[1]]$children[[1]]$gp$fill <- alpha(fill_color_1[i], 0.3)
-     grob.i <- grep("strip-b", gg_ct_o$layout$name)[i]
-     gg_ct_o$grobs[[grob.i]]$grobs[[1]]$children[[1]]$gp$fill <- alpha(fill_color_1[i], 0.3)
+expose_date <- function(a, b){
+     return(as.Date(seq.Date(a, b, by = 'day')))
 }
 
-fig_log <- fig_log_unjust + fig_log_just&
-        theme(axis.ticks.x = element_blank(),
-              axis.text.x = element_blank(),
-              plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
-              plot.margin = margin(0, 0.1, 0, 0.1, "cm"),
-              axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
-              axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
-              axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
-              strip.text.x = element_text(size = 12, face = 'bold'),
-              strip.text.y = element_text(size = 12, face = 'bold'),
-              strip.placement = "outside",
-              strip.background = element_rect(color = NA),
-              panel.spacing.x = unit(0, 'mm'),
-              legend.position = c(0.99, 0.99),
-              legend.justification = c(1, 1),
-              legend.box.margin = margin(0, 0, 0 ,0 , "cm"))
+expose_seq <- function(x, data){
+     infector_expose_dates <- seq.Date(from = data[x, 'infector_exposedate1'],
+                                       to = data[x, 'infector_exposedate2'],
+                                       by = 'day')
+     infectee_expose_dates <- seq.Date(from = data[x, 'infectee_exposedate1'],
+                                       to = data[x, 'infectee_exposedate2'],
+                                       by = 'day')
+     datafile <- as.data.frame(expand.grid(infectee_expose_dates, infector_expose_dates)) %>% 
+          mutate(median = as.numeric(Var1 - Var2),
+                 median = ifelse(median<0, NA, median))
+     gt_median <- median(datafile$median, na.rm = T)
+     gt_max <- max(infectee_expose_dates) - min(infector_expose_dates)
+     gt_min <- min(infectee_expose_dates) - max(infector_expose_dates)
+     gt_min <- ifelse(gt_min<0, 0, gt_min)
+     return(c(gt_min, gt_median, gt_max))
+}
 
-layout <- "
-ABCD
-EEFF
-"
+fit_best <- function(data, distribution.type = NULL){
+     data[data == 0] <- 1/2
+     fit.gamma <- try(fitdistr(data, "gamma"))
+     if (class(fit.gamma) == "try-error") {
+          fit.gamma$loglik <- NA
+     }
+     fit.weib <- try(fitdistr(data, "weibull"))
+     if (class(fit.weib) == "try-error") {
+          fit.weib$loglik <- NA
+     }
+     fit.lognorm <- try(fitdistr(data, "log-normal"))
+     if (class(fit.lognorm) == "try-error") {
+          fit.lognorm$loglik <- NA
+     }
+     fit.type <- c("gamma", "weibull", "lognormal")
+     distribution.type <- ifelse(is.null(distribution.type),
+                                 fit.type[which.max(c(fit.gamma$loglik, 
+                                                      fit.weib$loglik, fit.lognorm$loglik))],
+                                 distribution.type)
+     x <- NULL
+     rm(x)
+     if (distribution.type == "gamma") {
+          shape <- fit.gamma$estimate[1]
+          rate <- fit.gamma$estimate[2]
+          mean <- shape/rate
+          sd <- sqrt(shape)/rate
+          return(list(distr = 'gamma',
+                      shape = shape,
+                      rate = rate,
+                      mean = mean,
+                      sd = sd))
+     }
+     else if (distribution.type == "weibull") {
+          shape <- fit.weib$estimate[1]
+          scale <- fit.weib$estimate[2]
+          mean <- scale * exp(lgamma(1 + 1/shape))
+          sd <- sqrt(scale^2 * (exp(lgamma(1 + 2/shape)) - (exp(lgamma(1 + 1/shape)))^2))
+          return(list(distr = 'weibull',
+                      shape = shape,
+                      scale = scale,
+                      mean = mean,
+                      sd = sd))
+     }
+     else if (distribution.type == "lognormal") {
+          meanlog <- fit.lognorm$estimate[1]
+          sdlog <- fit.lognorm$estimate[2]
+          mean <- exp(1/2 * sdlog^2 + meanlog)
+          sd <- sqrt(exp(2 * meanlog + sdlog^2) * (exp(sdlog^2) - 1))
+          return(list(distr = 'lognormal',
+                      meanlog = meanlog,
+                      sdlog = sdlog,
+                      mean = mean,
+                      sd = sd))
+     }
+}
 
-fig_ct <- fig_ct_vaccine_n + fig_ct_voc_n + fig_ct_vaccine_o + fig_ct_voc_o + 
-     gg_ct_n + gg_ct_o+
-     plot_layout(nrow = 1, design = layout, heights = c(1, 1.4))&
-     theme(plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'),
-           plot.margin = margin(0, 0.1, 0, 0.1, "cm"),
-           axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold', color = 'black'),
-           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold', color = 'black'),
-           strip.text = element_text(size = 10, hjust = .5, vjust = 1, face = 'plain', color = 'black'),
-           strip.placement = "outside",
-           strip.background = element_rect(color = NA),
-           panel.spacing.x = unit(0, 'mm'),
-           legend.position = 'none')
+diff_dis <- function(shape1, rate1, shape2, rate2, n){
+     a <- sort(rgamma(n, shape1, rate1))
+     b <- sort(rgamma(n, shape2, rate2))
+     return(a - b)
+}
 
-cowplot::plot_grid(fig_ct, fig_log, 
-                   ncol = 1,
-                   rel_heights = c(2, 1))
+# fit incubation time -----------------------------------------------------
 
-ggsave(filename = './outcome/publish/Figure 4.pdf',
-       width = 14, height = 10)
+datafile_info <- datafile_info_BA1 %>% 
+     dplyr::select(dateonset, dateexpose1, dateexpose2, type) %>% 
+     mutate(date_seq_1 = dateonset - dateexpose1,
+            date_seq_2 = dateonset - dateexpose2) %>% 
+     filter(type != 'Asymptomatic')
+
+datafile_info$expose_date <- mapply(expose_date, datafile_info$dateexpose1, datafile_info$dateexpose2)
+
+ib_ba1 <- fit_gamma_incubation_dist(datafile_info, 
+                                    dateonset, 
+                                    dateexpose1,
+                                    dateexpose2)
+
+# ib_out <- capture.output(ib)
+
+datafile_BA2_ib <- datafile_info_BA2 %>% 
+     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type) %>% 
+     mutate(date_seq_1 = dateonset - dateexpose1,
+            date_seq_2 = dateonset - dateexpose2) %>% 
+     filter(type != 'Asymptomatic' & !is.na(date_seq_1))
+
+datafile_BA2_ib$expose_date <- mapply(expose_date, datafile_BA2_ib$dateexpose1, datafile_BA2_ib$dateexpose2)
+
+ib_ba2 <- fit_gamma_incubation_dist(datafile_BA2_ib, 
+                                    dateonset, 
+                                    dateexpose1,
+                                    dateexpose2) 
+
+
+datafile_Delta_ib <- datafile_info_Delta %>% 
+     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type) %>% 
+     mutate(date_seq_1 = dateonset - dateexpose1,
+            date_seq_2 = dateonset - dateexpose2) %>% 
+     filter(type != 'Asymptomatic' & !is.na(date_seq_1))
+
+ib_delta <- fit_gamma_incubation_dist(datafile_Delta_ib,
+                                      dateonset,
+                                      dateexpose1,
+                                      dateexpose2)
+
+# estimate SI -------------------------------------------------------------
+## R0 provide a function to estimate Generation Time distribution
+## This method actually base on estimate serial intervals
+
+library(R0)
+
+datafile_onset <- datafile_info_BA1 %>% 
+     filter(type != 'Asymptomatic') %>% 
+     dplyr::select(id, dateonset)
+
+datafile_cont_1 <- datafile_chains_BA1 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = dateonset) %>% 
+     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
+     rename('infector_date' = dateonset) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+datafile_onset <- datafile_info_BA2 %>% 
+     filter(type != 'Asymptomatic') %>% 
+     dplyr::select(id, dateonset)
+
+datafile_cont_2 <- datafile_chains_BA2 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = dateonset) %>% 
+     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
+     rename('infector_date' = dateonset) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+datafile_onset <- datafile_info_Delta %>% 
+     filter(type != 'Asymptomatic') %>% 
+     dplyr::select(id, dateonset)
+
+datafile_cont_3 <- datafile_chains_Delta %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = dateonset) %>% 
+     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
+     rename('infector_date' = dateonset) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+si_ba1 <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
+                   distribution.type = 'gamma')
+
+si_ba2 <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
+                   distribution.type = 'gamma')
+
+si_delta <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
+                     distribution.type = 'gamma')
+
+# estimate R0 -------------------------------------------------------------
+
+data_onset_1 <- datafile_info_BA1 %>%
+     group_by(dateonset) %>%
+     count() %>%
+     rename(c(
+          'cases' = 'n',
+          'date' = 'dateonset'
+     )) %>%
+     as.data.frame() %>%
+     complete(
+          date = seq.Date(from = min(date), to = max(date), by = 'day'),
+          fill = list(cases = 0)
+     )
+
+data_onset_2 <- datafile_info_BA2 %>%
+     group_by(dateonset) %>%
+     count() %>%
+     rename(c(
+          'cases' = 'n',
+          'date' = 'dateonset'
+     )) %>%
+     as.data.frame() %>%
+     complete(
+          date = seq.Date(from = min(date), to = max(date), by = 'day'),
+          fill = list(cases = 0)
+     )
+
+data_onset_3 <- datafile_info_Delta %>%
+     group_by(dateonset) %>%
+     count() %>%
+     rename(c(
+          'cases' = 'n',
+          'date' = 'dateonset'
+     )) %>%
+     as.data.frame() %>%
+     complete(
+          date = seq.Date(from = min(date), to = max(date), by = 'day'),
+          fill = list(cases = 0)
+     )
+
+r0_ba1 <- est.R0.ML(data_onset_1$cases, 
+                    generation.time('gamma', c(si_ba1$mean, si_ba1$sd)), 
+                    begin = 1, end = 8)
+# r0_out <- capture.output(r0)
+r0_ba2 <- est.R0.ML(data_onset_2$cases, 
+                    generation.time('gamma', c(si_ba2$mean, si_ba2$sd)), 
+                    begin = 1, end = 5)
+
+r0_delta <- est.R0.ML(data_onset_3$cases, 
+                      generation.time('gamma', c(si_ba2$mean, si_ba2$sd)), 
+                      begin = 1, end = 11)
+
+# estimate GT -------------------------------------------------------------
+
+data_expose <- datafile_info_BA1 %>% 
+     dplyr::select(id, dateexpose1, dateexpose2)
+
+datafile_cont_1 <- datafile_chains_BA1 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(data_expose, by = c('infectee' = 'id')) %>% 
+     rename(c('infectee_exposedate1' = dateexpose1,
+              'infectee_exposedate2' = dateexpose2))%>% 
+     left_join(data_expose, by = c('infector' = 'id')) %>% 
+     rename(c('infector_exposedate1' = dateexpose1,
+              'infector_exposedate2' = dateexpose2))
+
+datafile_expose_seq <- t(sapply(rownames(datafile_cont_1), expose_seq, 
+                                data = datafile_cont_1))
+
+datafile_cont_1 <- datafile_cont_1 %>% 
+     mutate(gt_min = datafile_expose_seq[,1],
+            gt_median = datafile_expose_seq[,2],
+            gt_max = datafile_expose_seq[,3])
+
+gt_ba1 <- fit_best(as.numeric(datafile_cont_1$gt_median), "gamma")
+
+data_expose <- datafile_info_BA2 %>% 
+     dplyr::select(id, dateexpose1, dateexpose2)
+
+datafile_cont_2 <- datafile_chains_BA2 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(data_expose, by = c('infectee' = 'id')) %>% 
+     rename(c('infectee_exposedate1' = dateexpose1,
+              'infectee_exposedate2' = dateexpose2))%>% 
+     left_join(data_expose, by = c('infector' = 'id')) %>% 
+     rename(c('infector_exposedate1' = dateexpose1,
+              'infector_exposedate2' = dateexpose2))
+
+datafile_expose_seq <- t(sapply(rownames(datafile_cont_2), expose_seq, 
+                                data = datafile_cont_2))
+
+datafile_cont_2 <- datafile_cont_2 %>% 
+     mutate(gt_min = datafile_expose_seq[,1],
+            gt_median = datafile_expose_seq[,2],
+            gt_max = datafile_expose_seq[,3])
+
+gt_ba2 <- fit_best(as.numeric(datafile_cont_2$gt_median), "gamma")
+
+data_expose <- datafile_info_Delta %>% 
+     dplyr::select(id, dateexpose1, dateexpose2)
+
+datafile_cont_3 <- datafile_chains_Delta %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(data_expose, by = c('infectee' = 'id')) %>% 
+     rename(c('infectee_exposedate1' = dateexpose1,
+              'infectee_exposedate2' = dateexpose2))%>% 
+     left_join(data_expose, by = c('infector' = 'id')) %>% 
+     rename(c('infector_exposedate1' = dateexpose1,
+              'infector_exposedate2' = dateexpose2)) |> 
+     filter(!is.na(infector_exposedate1) & !is.na(infectee_exposedate1)) |> 
+     mutate(gt_median = as.numeric(infectee_exposedate1 - infector_exposedate1),
+            gt_median = if_else(gt_median<0, 0, gt_median))
+
+gt_delta <- fit_best(as.numeric(datafile_cont_3$gt_median), "gamma")
+
+# estimate TG -------------------------------------------------------------
+
+datafile_positive <- datafile_info_BA1 %>% 
+     dplyr::select(id, datepositive)
+
+datafile_cont_1 <- datafile_chains_BA1 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = datepositive) %>% 
+     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
+     rename('infector_date' = datepositive) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+datafile_positive <- datafile_info_BA2 %>% 
+     dplyr::select(id, datepositive)
+
+datafile_cont_2 <- datafile_chains_BA2 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = datepositive) %>% 
+     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
+     rename('infector_date' = datepositive) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+datafile_positive <- datafile_info_Delta %>% 
+     dplyr::select(id, datepositive)
+
+datafile_cont_3 <- datafile_chains_Delta %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = datepositive) %>% 
+     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
+     rename('infector_date' = datepositive) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+tg_ba1 <- fit_best(as.numeric(datafile_cont_1$date_sep), "gamma")
+tg_ba2 <- fit_best(as.numeric(datafile_cont_2$date_sep), "gamma")
+tg_delta <- fit_best(as.numeric(datafile_cont_3$date_sep), "gamma")
+
+# write data --------------------------------------------------------------
+
+save(si_ba1, si_ba2, si_delta, 
+     ib_ba1, ib_ba2, ib_delta, 
+     r0_ba1, r0_ba2, r0_delta, 
+     file = './outcome/base/para.RData')
+
+# plot --------------------------------------------------------------------
+
+library(cowplot)
+
+fill_color <- rev(ggsci::pal_nejm()(4))[-3]
+
+## plot ib -----------------------------------------------------------------
+
+datafile <- data.frame(
+     variant = c('Delta', 'BA.1', 'BA.2'),
+     mean = c(ib_delta$mu, ib_ba1$mu, ib_ba2$mu),
+     sd = c(ib_delta$sd, ib_ba1$sd, ib_ba2$sd)
+)
+
+fig_ib_inside <- ggplot(data = datafile,
+                        mapping = aes(x = variant,
+                                      y = mean,
+                                      fill = variant))+
+     geom_bar(stat="identity", color="black", 
+              position=position_dodge())+
+     geom_errorbar(mapping = aes(ymin=mean-sd, ymax=mean+sd), 
+                   width=.2,
+                   position=position_dodge())+
+     scale_fill_manual(values = fill_color,
+                       breaks = datafile$variant)+
+     scale_x_discrete(limits = datafile$variant)+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 12))+
+     theme_bw(base_family = 'Helvetica')+
+     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
+     labs(x = '',
+          y = '')+
+     guides(fill = 'none')
+
+fig_ib <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_delta$distribution$parameters$shape, 
+                               scale = ib_delta$distribution$parameters$scale),
+                   mapping = aes(colour = 'Delta'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_ba1$distribution$parameters$shape, 
+                               scale = ib_ba1$distribution$parameters$scale),
+                   mapping = aes(colour = 'BA.1'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_ba2$distribution$parameters$shape, 
+                               scale = ib_ba2$distribution$parameters$scale),
+                   mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.4,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Incubation period of VOC')+
+     coord_cartesian(clip = "off")+
+     scale_color_manual(values = fill_color,
+                        breaks = datafile$variant)+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.4),
+                        labels = label_number(accuracy = 0.1))+
+     theme_classic(base_family = 'Helvetica')+
+     labs(x = '',
+          y = 'Relative frequency',
+          colour = '',
+          title = 'a')+
+     guides(color = 'none')
+
+fig_ib <- fig_ib + inset_element(fig_ib_inside, 0.4, 0.2, 1, 1)
+
+## plot si -----------------------------------------------------------------
+
+datafile <- data.frame(
+     variant = c('Delta', 'BA.1', 'BA.2'),
+     mean = c(si_delta$mean, si_ba1$mean, si_ba2$mean),
+     sd = c(si_delta$sd, si_ba1$sd, si_ba2$sd)
+)
+
+fig_si_inside <- ggplot(data = datafile,
+                        mapping = aes(x = variant,
+                                      y = mean,
+                                      fill = variant))+
+     geom_bar(stat="identity", color="black", 
+              position=position_dodge())+
+     geom_errorbar(mapping = aes(ymin=mean-sd, ymax=mean+sd), 
+                   width=.2,
+                   position=position_dodge())+
+     scale_fill_manual(values = fill_color,
+                       breaks = datafile$variant)+
+     scale_x_discrete(limits = datafile$variant)+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 12))+
+     theme_bw(base_family = 'Helvetica')+
+     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
+     labs(x = '',
+          y = '')+
+     guides(fill = 'none')
+
+fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_delta$shape, 
+                               rate = si_delta$rate),
+                   mapping = aes(colour = 'Delta'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba1$shape, 
+                               rate = si_ba1$rate),
+                   mapping = aes(colour = 'BA.1'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba2$shape, 
+                               rate = si_ba2$rate),
+                   mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.4,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Serial interval of VOC')+
+     coord_cartesian(clip = "off")+
+     scale_color_manual(values = fill_color,
+                        breaks = datafile$variant)+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.4),
+                        labels = label_number(accuracy = 0.1))+
+     labs(x = 'Time (days)',
+          y = 'Relative frequency',
+          colour = 'Variants',
+          title = 'c')+
+     theme_classic(base_family = 'Helvetica')+
+     theme(legend.position = 'bottom')+ 
+     guides(color = 'none')
+
+fig_si <- fig_si + 
+     inset_element(fig_si_inside, 0.4, 0.2, 1, 1)
+
+## plot tg -----------------------------------------------------------------
+
+datafile <- data.frame(
+     variant = c('Delta', 'BA.1', 'BA.2'),
+     shape = c(tg_delta$shape, tg_ba1$shape, tg_ba2$shape),
+     rate = c(tg_delta$rate, tg_ba1$rate, tg_ba2$rate)
+) |> 
+     mutate(mean = shape/rate,
+            sd = sqrt(shape)/rate)
+
+fig_tg_inside <- ggplot(data = datafile,
+                        mapping = aes(x = variant,
+                                      y = mean,
+                                      fill = variant))+
+     geom_bar(stat="identity", color="black", 
+              position=position_dodge())+
+     geom_errorbar(mapping = aes(ymin=ifelse(mean-sd < 0, 0.01, mean-sd), ymax=mean+sd), 
+                   width=.2,
+                   position=position_dodge())+
+     scale_fill_manual(values = fill_color,
+                       breaks = datafile$variant)+
+     scale_x_discrete(limits = datafile$variant)+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 12))+
+     theme_bw(base_family = 'Helvetica')+
+     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
+     labs(x = '',
+          y = '')+
+     guides(fill = 'none')
+
+fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_delta$shape, 
+                               rate = tg_delta$rate),
+                   mapping = aes(colour = 'Delta'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_ba1$shape, 
+                               rate = tg_ba1$rate),
+                   mapping = aes(colour = 'BA.1'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_ba2$shape, 
+                               rate = tg_ba2$rate),
+                   mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.5,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Transmission generation of VOC')+
+     coord_cartesian(clip = "off")+
+     scale_color_manual(values = fill_color,
+                        breaks = datafile$variant)+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.5),
+                        labels = label_number(accuracy = 0.1))+
+     theme_classic(base_family = 'Helvetica')+
+     labs(x = 'Time (days)',
+          y = '',
+          colour = '',
+          title = 'd')+
+     guides(color = 'none')
+
+fig_tg <- fig_tg + 
+     inset_element(fig_tg_inside, 0.4, 0.2, 1, 1)
+
+## plot gt -----------------------------------------------------------------
+
+datafile <- data.frame(
+     variant = c('Delta', 'BA.1', 'BA.2'),
+     shape = c(gt_delta$shape, gt_ba1$shape, gt_ba2$shape),
+     rate = c(gt_delta$rate, gt_ba1$rate, gt_ba2$rate)
+) |> 
+     mutate(mean = shape/rate,
+            sd = sqrt(shape)/rate)
+
+fig_gt_inside <- ggplot(data = datafile,
+                        mapping = aes(x = variant,
+                                      y = mean,
+                                      fill = variant))+
+     geom_bar(stat="identity", color="black", 
+              position=position_dodge())+
+     geom_errorbar(mapping = aes(ymin=ifelse(mean-sd < 0, 0.01, mean-sd), ymax=mean+sd), 
+                   width=.2,
+                   position=position_dodge())+
+     scale_fill_manual(values = fill_color,
+                       breaks = datafile$variant)+
+     scale_x_discrete(limits = datafile$variant)+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 12))+
+     theme_bw(base_family = 'Helvetica')+
+     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
+     labs(x = '',
+          y = '')+
+     guides(fill = 'none')
+
+fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_delta$shape, 
+                               rate = gt_delta$rate),
+                   mapping = aes(colour = 'Delta'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_ba1$shape, 
+                               rate = gt_ba1$rate),
+                   mapping = aes(colour = 'BA.1'))+
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_ba2$shape, 
+                               rate = gt_ba2$rate),
+                   mapping = aes(colour = 'BA.2'))+
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.5,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Generation time (probable) of VOC')+
+     coord_cartesian(clip = "off")+
+     scale_color_manual(values = fill_color, 
+                        breaks = datafile$variant)+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.5),
+                        labels = label_number(accuracy = 0.1))+
+     theme_classic(base_family = 'Helvetica')+
+     labs(x = '',
+          y = '',
+          colour = '',
+          title = 'b')+
+     guides(color = 'none')
+
+fig_gt <- fig_gt + 
+     inset_element(fig_gt_inside, 0.4, 0.2, 1, 1)
+
+
+## plot differ -----------------------------------------------------------
+
+diff_delta <- diff_dis(si_delta$shape,si_delta$rate,
+                       ib_delta$distribution$parameters$shape,
+                       1 / ib_delta$distribution$parameters$scale,
+                       100000)
+diff_ba1 <- diff_dis(si_ba1$shape,si_ba1$rate,
+                     ib_ba1$distribution$parameters$shape,
+                     1 / ib_ba1$distribution$parameters$scale,
+                     100000)
+diff_ba2 <- diff_dis(si_ba2$shape,si_ba2$rate,
+                     ib_ba2$distribution$parameters$shape,
+                     1 / ib_ba2$distribution$parameters$scale,
+                     100000)
+
+datafile <- data.frame(
+     variant = rep(c('Delta', 'BA.1', 'BA.2'),
+                   each = 100000),
+     mean = c(diff_delta, diff_ba1, diff_ba2))
+datafile$variant <- factor(datafile$variant,
+                           levels = c('Delta', 'BA.1', 'BA.2'))
+
+fig_diff <- ggplot(datafile)+
+     geom_boxplot(mapping = aes(x = mean,
+                                y = variant),
+                  fill = fill_color)+
+     scale_x_continuous(expand = c(0, 0),
+                        limits = c(-5, 10))+
+     annotate(geom = 'text',
+              x = 2.5,
+              y = Inf,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Differ between SI and IP')+
+     coord_cartesian(clip = "off")+
+     theme_classic(base_family = 'Helvetica')+
+     labs(x = 'Time (days)',
+          y = '',
+          colour = '',
+          title = 'e')+
+     guides(fill = 'none')
+
+# plot Reff ---------------------------------------------------------------
+
+datafile <- data.frame(
+     variant = c('Delta', 'BA.1', 'BA.2'),
+     mean = c(r0_delta$R, r0_ba1$R, r0_ba2$R),
+     low_ci = c(r0_delta$conf.int[1], r0_ba1$conf.int[1], r0_ba2$conf.int[1]),
+     top_ci = c(r0_delta$conf.int[2], r0_ba1$conf.int[2], r0_ba2$conf.int[2])
+) |> 
+     mutate_if(is.numeric, round, digits = 2) |> 
+     mutate(labels = paste0(mean, 
+                            " (", low_ci, "-", top_ci, ")"))
+
+fig_reff <- ggplot(data = datafile,
+                   mapping = aes(y = variant,
+                                 x = mean,
+                                 fill = variant))+
+     geom_bar(stat="identity", color="black", 
+              position=position_dodge())+
+     geom_errorbar(mapping = aes(xmin=low_ci, xmax=top_ci), 
+                   width=.2,
+                   position=position_dodge())+
+     geom_text(aes(label = labels),
+               color = fill_color,
+               position = position_dodge(width = 0.7),
+               size = 10*5/14,
+               vjust = -1,
+               hjust = -0.1
+     )+
+     # annotate(geom = 'text',
+     #          x = 5,
+     #          y = Inf,
+     #          vjust = -0.7,
+     #          size = 11*5/14,
+     #          family = 'Helvetica',
+     #          label = 'Effective reproductive number')+
+     coord_cartesian(clip = "off")+
+     scale_fill_manual(values = fill_color,
+                       breaks = datafile$variant)+
+     scale_y_discrete(limits = datafile$variant)+
+     scale_x_continuous(expand = c(0, 0),
+                        limits = c(0, 10),
+                        breaks = seq(0, 10, 2))+
+     theme_classic(base_family = 'Helvetica')+
+     labs(x = 'Effective reproductive number',
+          y = '',
+          colour = '',
+          title = 'f')+
+     guides(fill = 'none')
+
+# multiplot ---------------------------------------------------------------
+
+fig <- fig_ib + fig_gt + fig_si + fig_tg + fig_diff + fig_reff+
+     plot_layout(ncol = 2, byrow = T) &
+     theme(axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
+           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
+           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold'),
+           strip.text.x = element_text(size = 12, face = 'bold'),
+           strip.text.y = element_text(size = 12, face = 'bold'),
+           panel.grid.major = element_blank(), 
+           panel.grid.minor = element_blank(),
+           panel.background = element_blank(),
+           plot.margin = margin(1, 5, 1, 1),
+           plot.background = element_blank(),
+           plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'))
+
+fig
+
+ggsave(filename = './outcome/publish/Figure 4.pdf', 
+       height = 7, width = 7)

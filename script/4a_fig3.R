@@ -2,795 +2,352 @@
 # packages ----------------------------------------------------------------
 
 library(tidyverse)
+library(ggrepel)
+library(ggraph)
+library(cowplot)
 library(patchwork)
-library(scales)
-library(openxlsx)
 library(ggsci)
-
+library(prismatic, include.only = 'best_contrast')
 library(showtext)
+
 font_add('Helvetica', 
          "./script/fonts/Helvetica.ttf",
          bold = "./script/fonts/Helvetica-Bold.ttf")
 
 remove(list = ls())
 
-load('data/sars_2_cov.Rdata')
+fill_color <- c(alpha("#BC3C29FF", 0.3), "#BC3C29FF", 
+                alpha("#E18727FF", 0.3), "#E18727FF",
+                alpha("#20854EFF", 0.3), "#20854EFF" 
+                )
+fill_color_1 <- pal_nejm()(8)[c(2, 5:8)]
 
-set.seed(202202)
-
-# function ----------------------------------------------------------------
-
-library(epitrix)
-
-expose_date <- function(a, b){
-     return(as.Date(seq.Date(a, b, by = 'day')))
-}
-
-expose_seq <- function(x, data){
-     infector_expose_dates <- seq.Date(from = data[x, 'infector_exposedate1'],
-                                       to = data[x, 'infector_exposedate2'],
-                                       by = 'day')
-     infectee_expose_dates <- seq.Date(from = data[x, 'infectee_exposedate1'],
-                                       to = data[x, 'infectee_exposedate2'],
-                                       by = 'day')
-     datafile <- as.data.frame(expand.grid(infectee_expose_dates, infector_expose_dates)) %>% 
-          mutate(median = as.numeric(Var1 - Var2),
-                 median = ifelse(median<0, NA, median))
-     gt_median <- median(datafile$median, na.rm = T)
-     gt_max <- max(infectee_expose_dates) - min(infector_expose_dates)
-     gt_min <- min(infectee_expose_dates) - max(infector_expose_dates)
-     gt_min <- ifelse(gt_min<0, 0, gt_min)
-     return(c(gt_min, gt_median, gt_max))
-}
-
-fit_best <- function(data, distribution.type = NULL){
-     data[data == 0] <- 1/2
-     fit.gamma <- try(fitdistr(data, "gamma"))
-     if (class(fit.gamma) == "try-error") {
-          fit.gamma$loglik <- NA
-     }
-     fit.weib <- try(fitdistr(data, "weibull"))
-     if (class(fit.weib) == "try-error") {
-          fit.weib$loglik <- NA
-     }
-     fit.lognorm <- try(fitdistr(data, "log-normal"))
-     if (class(fit.lognorm) == "try-error") {
-          fit.lognorm$loglik <- NA
-     }
-     fit.type <- c("gamma", "weibull", "lognormal")
-     distribution.type <- ifelse(is.null(distribution.type),
-                                 fit.type[which.max(c(fit.gamma$loglik, 
-                                                      fit.weib$loglik, fit.lognorm$loglik))],
-                                 distribution.type)
-     x <- NULL
-     rm(x)
-     if (distribution.type == "gamma") {
-          shape <- fit.gamma$estimate[1]
-          rate <- fit.gamma$estimate[2]
-          mean <- shape/rate
-          sd <- sqrt(shape)/rate
-          return(list(distr = 'gamma',
-                      shape = shape,
-                      rate = rate,
-                      mean = mean,
-                      sd = sd))
-     }
-     else if (distribution.type == "weibull") {
-          shape <- fit.weib$estimate[1]
-          scale <- fit.weib$estimate[2]
-          mean <- scale * exp(lgamma(1 + 1/shape))
-          sd <- sqrt(scale^2 * (exp(lgamma(1 + 2/shape)) - (exp(lgamma(1 + 1/shape)))^2))
-          return(list(distr = 'weibull',
-                      shape = shape,
-                      scale = scale,
-                      mean = mean,
-                      sd = sd))
-     }
-     else if (distribution.type == "lognormal") {
-          meanlog <- fit.lognorm$estimate[1]
-          sdlog <- fit.lognorm$estimate[2]
-          mean <- exp(1/2 * sdlog^2 + meanlog)
-          sd <- sqrt(exp(2 * meanlog + sdlog^2) * (exp(sdlog^2) - 1))
-          return(list(distr = 'lognormal',
-                      meanlog = meanlog,
-                      sdlog = sdlog,
-                      mean = mean,
-                      sd = sd))
-     }
-}
-
-diff_dis <- function(shape1, rate1, shape2, rate2, n){
-     a <- sort(rgamma(n, shape1, rate1))
-     b <- sort(rgamma(n, shape2, rate2))
-     return(a - b)
-}
-
-# fit incubation time -----------------------------------------------------
-
-datafile_info <- datafile_info_BA1 %>% 
-     dplyr::select(dateonset, dateexpose1, dateexpose2, type) %>% 
-     mutate(date_seq_1 = dateonset - dateexpose1,
-            date_seq_2 = dateonset - dateexpose2) %>% 
-     filter(type != 'Asymptomatic')
-
-datafile_info$expose_date <- mapply(expose_date, datafile_info$dateexpose1, datafile_info$dateexpose2)
-
-ib_ba1 <- fit_gamma_incubation_dist(datafile_info, 
-                                    dateonset, 
-                                    dateexpose1,
-                                    dateexpose2)
-
-# ib_out <- capture.output(ib)
-
-datafile_BA2_ib <- datafile_info_BA2 %>% 
-     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type) %>% 
-     mutate(date_seq_1 = dateonset - dateexpose1,
-            date_seq_2 = dateonset - dateexpose2) %>% 
-     filter(type != 'Asymptomatic' & !is.na(date_seq_1))
-
-datafile_BA2_ib$expose_date <- mapply(expose_date, datafile_BA2_ib$dateexpose1, datafile_BA2_ib$dateexpose2)
-
-ib_ba2 <- fit_gamma_incubation_dist(datafile_BA2_ib, 
-                                    dateonset, 
-                                    dateexpose1,
-                                    dateexpose2) 
+load('./data/sars_2_cov.Rdata')
 
 
-datafile_Delta_ib <- datafile_info_Delta %>% 
-     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type) %>% 
-     mutate(date_seq_1 = dateonset - dateexpose1,
-            date_seq_2 = dateonset - dateexpose2) %>% 
-     filter(type != 'Asymptomatic' & !is.na(date_seq_1))
+# infections vaccine and age ----------------------------------------------
 
-ib_delta <- fit_gamma_incubation_dist(datafile_Delta_ib,
-                                      dateonset,
-                                      dateexpose1,
-                                      dateexpose2)
+datafile_info_BA1$lineage <- 'BA1'
+datafile_info_BA2$lineage <- 'BA2'
+datafile_info_BA2$location1 <- '厦门'
+datafile_info_BA2$location2 <- '厦门'
+datafile_info_Delta$lineage <- 'Delta'
 
-# estimate SI -------------------------------------------------------------
-## R0 provide a function to estimate Generation Time distribution
-## This method actually base on estimate serial intervals
+datafile_info <- rbind(datafile_info_Delta,
+                       datafile_info_BA1,
+                       mutate(datafile_info_BA2, gender = NA))|> 
+     select(age, vaccine, vaccine_type, lineage) |> 
+     mutate(age_g = if_else(age <=18, 'c', 'a'),
+            age_g = if_else(age >=65, 'o', age_g),
+            age_g = factor(age_g, 
+                           levels = c('c', 'a', 'o')),
+            vaccine_mix = case_when(
+                 is.na(vaccine_type) ~ 'U',
+                 vaccine_type == "Combind" ~ 'M',
+                 vaccine_type != "Combind" ~ 'U',
+                 TRUE ~ as.character(vaccine_type)
+            ),
+            vaccine = factor(vaccine, 
+                             levels = c(3, 2, 1, 0),
+                             labels = c('A', 'B', 'C', 'C')))
 
-library(R0)
+datafile_percent <- datafile_info |> 
+     group_by(age_g, lineage, vaccine, vaccine_mix) |> 
+     count() |> 
+     ungroup() |> 
+     mutate(group = paste(vaccine, vaccine_mix, sep = "_"),
+            group = factor(group,
+                           levels = c("C_U", "C_M", "B_U", "B_M", "A_U", "A_M")))
 
-datafile_onset <- datafile_info_BA1 %>% 
-     filter(type != 'Asymptomatic') %>% 
-     dplyr::select(id, dateonset)
+datafile_total <- datafile_info |> 
+     group_by(age_g, lineage) |> 
+     count()
 
-datafile_cont_1 <- datafile_chains_BA1 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = dateonset) %>% 
-     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = dateonset) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
+datafile_label <- data.frame(x = rep(1, 3),
+                             y = rep('a', 3),
+                             label = rep('Number of infections', 3),
+                             lineage = c('BA2', 'BA1', 'Delta'))
 
-datafile_onset <- datafile_info_BA2 %>% 
-     filter(type != 'Asymptomatic') %>% 
-     dplyr::select(id, dateonset)
 
-datafile_cont_2 <- datafile_chains_BA2 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = dateonset) %>% 
-     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = dateonset) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
+# infections plot ---------------------------------------------------------
 
-datafile_onset <- datafile_info_Delta %>% 
-     filter(type != 'Asymptomatic') %>% 
-     dplyr::select(id, dateonset)
+fig_inf <- ggplot(datafile_percent)+
+     geom_bar(mapping = aes(y = age_g,
+                            x = n, 
+                            fill = group),
+              color = 'black',
+              stat="identity",
+              position = position_fill(reverse = T),
+              show.legend = T)+
+     geom_text(data = filter(datafile_total),
+               mapping = aes(x = 1,
+                             y = age_g,
+                             label = n),
+               vjust = -0.2,
+               angle = -90,
+               family = 'Helvetica')+
+     geom_text(data = datafile_label,
+               mapping = aes(x = x,
+                             y = y,
+                             label = label),
+               vjust = -2,
+               angle = -90,
+               family = 'Helvetica')+
+     facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))), 
+                ncol = 1,
+                scales = 'free_x',
+                labeller = as_labeller(c(
+                      Delta = 'e',
+                      BA1 = 'c',
+                      BA2 = 'a'
+                )))+
+     scale_y_discrete(labels = c('0-18', '19-64', '65-'),
+                      expand = c(0, 0.6),
+                      breaks = c('c', 'a', 'o'))+
+     scale_x_continuous(n.breaks = 6,
+                        expand =  expansion(add = c(0, 0)))+
+     scale_fill_manual(values = fill_color,
+                       labels = c('Unfully Vaccinated & Unmixed', 
+                                  'Unfully Vaccinated & Mixed',
+                                  'Fully Vaccinated & Unmixed',
+                                  'Fully Vaccinated & Mixed', 
+                                  'Booster Dose & Unmixed', 
+                                  'Booster Dose & Mixed'
+                                  ),
+                       na.translate = F)+
+     coord_cartesian(clip = "off")+
+     theme_classic(base_family = 'Helvetica')+
+     labs(y = "",
+          x = 'Proportions',
+          fill = 'Vaccination status')
 
-datafile_cont_3 <- datafile_chains_Delta %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = dateonset) %>% 
-     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = dateonset) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
+# contacts vaccine and age ------------------------------------------------
 
-si_ba1 <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
-                   distribution.type = 'gamma')
+datafile_cont_BA1$lineage <- 'BA1'
+datafile_cont_BA2$lineage <- 'BA2'
+datafile_cont_Delta$lineage <- 'Delta'
 
-si_ba2 <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
-                   distribution.type = 'gamma')
+datafile_cont <- rbind(datafile_cont_Delta,
+                       datafile_cont_BA1,
+                       mutate(datafile_cont_BA2, gender = NA))|> 
+     select(age, vaccine, vaccine_mix, lineage) |> 
+     mutate(age_g = if_else(age <=18, 'c', 'a'),
+            age_g = if_else(age >=65, 'o', age_g),
+            age_g = factor(age_g, levels = c('c', 'a', 'o')),
+            vaccine_mix = if_else(is.na(vaccine_mix), 
+                                  'N', 
+                                  vaccine_mix)) |> 
+     mutate(vaccine = factor(vaccine, 
+                             levels = c(3, 2, 1, 0),
+                             labels = c('A', 'B', 'C', 'C')),
+            vaccine_mix = if_else(vaccine_mix == 'Y', 'M', 'U'))
 
-si_delta <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
-                     distribution.type = 'gamma')
+datafile_percent <- datafile_cont |> 
+     group_by(age_g, lineage, vaccine, vaccine_mix) |> 
+     count() |> 
+     filter(!is.na(age_g)) |> 
+     ungroup() |> 
+     mutate(group = paste(vaccine, vaccine_mix, sep = "_"),
+            group = factor(group,
+                           levels = c("C_U", "C_M", "B_U", "B_M", "A_U", "A_M")))
 
-# estimate R0 -------------------------------------------------------------
+datafile_total <- datafile_cont |> 
+     group_by(age_g, lineage) |> 
+     count() |> 
+     filter(!is.na(age_g))
 
-data_onset_1 <- datafile_info_BA1 %>%
-     group_by(dateonset) %>%
-     count() %>%
-     rename(c(
-          'cases' = 'n',
-          'date' = 'dateonset'
-     )) %>%
-     as.data.frame() %>%
-     complete(
-          date = seq.Date(from = min(date), to = max(date), by = 'day'),
-          fill = list(cases = 0)
-     )
+datafile_label <- data.frame(x = rep(1, 3),
+                             y = rep('a', 3),
+                             label = rep('Number of contacts', 3),
+                             lineage = c('BA2', 'BA1', 'Delta'))
 
-data_onset_2 <- datafile_info_BA2 %>%
-     group_by(dateonset) %>%
-     count() %>%
-     rename(c(
-          'cases' = 'n',
-          'date' = 'dateonset'
-     )) %>%
-     as.data.frame() %>%
-     complete(
-          date = seq.Date(from = min(date), to = max(date), by = 'day'),
-          fill = list(cases = 0)
-     )
+# contacts ----------------------------------------------------------------
 
-data_onset_3 <- datafile_info_Delta %>%
-     group_by(dateonset) %>%
-     count() %>%
-     rename(c(
-          'cases' = 'n',
-          'date' = 'dateonset'
-     )) %>%
-     as.data.frame() %>%
-     complete(
-          date = seq.Date(from = min(date), to = max(date), by = 'day'),
-          fill = list(cases = 0)
-     )
+fig_cont <- ggplot(datafile_percent)+
+     geom_bar(mapping = aes(y = age_g,
+                            x = n, 
+                            fill = group),
+              color = 'black',
+              stat="identity",
+              position = position_fill(reverse = T),
+              show.legend = T)+
+     geom_text(data = filter(datafile_total),
+               mapping = aes(x = 1,
+                             y = age_g,
+                             label = n),
+               vjust = -0.2,
+               angle = -90,
+               family = 'Helvetica')+
+     geom_text(data = datafile_label,
+               mapping = aes(x = x,
+                             y = y,
+                             label = label),
+               vjust = -2,
+               angle = -90,
+               family = 'Helvetica')+
+     facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))), 
+                ncol = 1,
+                scales = 'free_x',
+                labeller = as_labeller(c(
+                     Delta = 'f',
+                     BA1 = 'd',
+                     BA2 = 'b'
+                )))+
+     scale_y_discrete(labels = c('0-18', '19-64', '65-'),
+                      expand = c(0, 0.6),
+                      breaks = c('c', 'a', 'o'))+
+     scale_x_continuous(n.breaks = 6,
+                        expand =  expansion(add = c(0, 0)))+
+     scale_fill_manual(values = fill_color,
+                       labels = c('Unfully Vaccinated & Unmixed', 
+                                  'Unfully Vaccinated & Mixed',
+                                  'Fully Vaccinated & Unmixed',
+                                  'Fully Vaccinated & Mixed', 
+                                  'Booster Dose & Unmixed', 
+                                  'Booster Dose & Mixed'
+                       ),
+                       na.translate = F)+
+     coord_cartesian(clip = "off")+
+     theme_classic(base_family = 'Helvetica')+
+     labs(y = "",
+          x = 'Proportions',
+          fill = 'Vaccination status')
 
-r0_ba1 <- est.R0.ML(data_onset_1$cases, 
-                    generation.time('gamma', c(si_ba1$mean, si_ba1$sd)), 
-                    begin = 1, end = 8)
-# r0_out <- capture.output(r0)
-r0_ba2 <- est.R0.ML(data_onset_2$cases, 
-                    generation.time('gamma', c(si_ba2$mean, si_ba2$sd)), 
-                    begin = 1, end = 5)
+# combined plot ------------------------------------------------------------
 
-r0_delta <- est.R0.ML(data_onset_3$cases, 
-                      generation.time('gamma', c(si_ba2$mean, si_ba2$sd)), 
-                      begin = 1, end = 11)
+fig_1 <- fig_inf + fig_cont +
+     plot_layout(guides = 'collect')&
+     theme(plot.title = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+           plot.margin = margin(0, 1, 0, 0, "cm"),
+           axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
+           strip.text = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+           strip.background = element_blank(),
+           panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(),
+           legend.position = 'bottom')
 
-# estimate GT -------------------------------------------------------------
+fig_1
 
-data_expose <- datafile_info_BA1 %>% 
-     dplyr::select(id, dateexpose1, dateexpose2)
+# vaccine manufacturer ----------------------------------------------------
 
-datafile_cont_1 <- datafile_chains_BA1 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(data_expose, by = c('infectee' = 'id')) %>% 
-     rename(c('infectee_exposedate1' = dateexpose1,
-              'infectee_exposedate2' = dateexpose2))%>% 
-     left_join(data_expose, by = c('infector' = 'id')) %>% 
-     rename(c('infector_exposedate1' = dateexpose1,
-              'infector_exposedate2' = dateexpose2))
+datafile_cont <- rbind(datafile_cont_Delta,
+                       datafile_cont_BA1,
+                       mutate(datafile_cont_BA2, gender = NA))|> 
+        select(age, vaccine, vaccine_type, vaccine_mix, lineage) |> 
+        mutate(age_g = if_else(age <=18, 'c', 'a'),
+               age_g = if_else(age >=65, 'o', age_g),
+               age_g = factor(age_g, levels = c('c', 'a', 'o')),
+               vaccine_mix = if_else(is.na(vaccine_mix), 
+                                     'N', 
+                                     vaccine_mix)) |> 
+        mutate(vaccine = factor(vaccine, 
+                                levels = 0:3,
+                                labels = c('C', 'C', 'B', 'A')),
+               vaccine_mix = if_else(vaccine_mix == 'Y', 'M', 'U'),
+               vaccine_g = str_remove_all(vaccine_type, '[_]'),
+               vaccine_g = sapply(vaccine_g, FUN = function(x){
+                       paste(sort(unique(strsplit(x, "")[[1]])), collapse = '')
+               })) |> 
+        group_by(vaccine, vaccine_g, lineage) |> 
+        count() |> 
+        ungroup() |> 
+        filter(vaccine_g != "")
 
-datafile_expose_seq <- t(sapply(rownames(datafile_cont_1), expose_seq, 
-                                data = datafile_cont_1))
+datafile_cont_back <- datafile_cont |> 
+        group_by(lineage, vaccine) |> 
+        summarise(n = sum(n),
+                  .groups = 'drop')
 
-datafile_cont_1 <- datafile_cont_1 %>% 
-     mutate(gt_min = datafile_expose_seq[,1],
-            gt_median = datafile_expose_seq[,2],
-            gt_max = datafile_expose_seq[,3])
+# datafile_cont_top <- datafile_cont |>
+#         arrange(desc(n)) |>
+#         group_by(lineage, vaccine) |>
+#         slice(1:3)
+datafile_cont_top <- datafile_cont |> 
+        group_by(lineage, vaccine) |> 
+        filter(vaccine_g %in% c('P', 'V', 'C', 'PV')) |> 
+        select(vaccine, vaccine_g, lineage, n)
 
-gt_ba1 <- fit_best(as.numeric(datafile_cont_1$gt_median), "gamma")
-
-data_expose <- datafile_info_BA2 %>% 
-     dplyr::select(id, dateexpose1, dateexpose2)
-
-datafile_cont_2 <- datafile_chains_BA2 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(data_expose, by = c('infectee' = 'id')) %>% 
-     rename(c('infectee_exposedate1' = dateexpose1,
-              'infectee_exposedate2' = dateexpose2))%>% 
-     left_join(data_expose, by = c('infector' = 'id')) %>% 
-     rename(c('infector_exposedate1' = dateexpose1,
-              'infector_exposedate2' = dateexpose2))
-
-datafile_expose_seq <- t(sapply(rownames(datafile_cont_2), expose_seq, 
-                                data = datafile_cont_2))
-
-datafile_cont_2 <- datafile_cont_2 %>% 
-     mutate(gt_min = datafile_expose_seq[,1],
-            gt_median = datafile_expose_seq[,2],
-            gt_max = datafile_expose_seq[,3])
-
-gt_ba2 <- fit_best(as.numeric(datafile_cont_2$gt_median), "gamma")
-
-data_expose <- datafile_info_Delta %>% 
-     dplyr::select(id, dateexpose1, dateexpose2)
-
-datafile_cont_3 <- datafile_chains_Delta %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(data_expose, by = c('infectee' = 'id')) %>% 
-     rename(c('infectee_exposedate1' = dateexpose1,
-              'infectee_exposedate2' = dateexpose2))%>% 
-     left_join(data_expose, by = c('infector' = 'id')) %>% 
-     rename(c('infector_exposedate1' = dateexpose1,
-              'infector_exposedate2' = dateexpose2)) |> 
-     filter(!is.na(infector_exposedate1) & !is.na(infectee_exposedate1)) |> 
-     mutate(gt_median = as.numeric(infectee_exposedate1 - infector_exposedate1),
-            gt_median = if_else(gt_median<0, 0, gt_median))
-
-gt_delta <- fit_best(as.numeric(datafile_cont_3$gt_median), "gamma")
-
-# estimate TG -------------------------------------------------------------
-
-datafile_positive <- datafile_info_BA1 %>% 
-     dplyr::select(id, datepositive)
-
-datafile_cont_1 <- datafile_chains_BA1 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = datepositive) %>% 
-     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = datepositive) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
-
-datafile_positive <- datafile_info_BA2 %>% 
-     dplyr::select(id, datepositive)
-
-datafile_cont_2 <- datafile_chains_BA2 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = datepositive) %>% 
-     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = datepositive) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
-
-datafile_positive <- datafile_info_Delta %>% 
-     dplyr::select(id, datepositive)
-
-datafile_cont_3 <- datafile_chains_Delta %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = datepositive) %>% 
-     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = datepositive) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
-
-tg_ba1 <- fit_best(as.numeric(datafile_cont_1$date_sep), "gamma")
-tg_ba2 <- fit_best(as.numeric(datafile_cont_2$date_sep), "gamma")
-tg_delta <- fit_best(as.numeric(datafile_cont_3$date_sep), "gamma")
-
-# write data --------------------------------------------------------------
-
-save(si_ba1, si_ba2, si_delta, 
-     ib_ba1, ib_ba2, ib_delta, 
-     r0_ba1, r0_ba2, r0_delta, 
-     file = './outcome/base/para.RData')
+datafile_cout_sum <- datafile_cont_top |> 
+        summarise(n = sum(n),
+                  .groups = 'drop') |> 
+        left_join(datafile_cont_back,
+                  by = c("lineage", "vaccine")) |> 
+        mutate(n = n.y - n.x,
+               vaccine_g = 'Other') |> 
+        select(lineage, vaccine, vaccine_g, n) |> 
+        rbind(datafile_cont_top) |> 
+        mutate(vaccine_g = if_else(vaccine_g == "",
+                                   'Unvaccine',
+                                   vaccine_g),
+               vaccine_g = factor(vaccine_g,
+                                  levels = c('P', 'V', 'C', 'PV', 'Other', 'Unvaccine')))
 
 # plot --------------------------------------------------------------------
 
-library(cowplot)
+datafile_label <- data.frame(x = rep('B', 3),
+                             y = rep(2500, 3),
+                             label = c('Omicron BA.2 outbreak',
+                                       'Omicron BA.1 outbreak',
+                                       'Delta outbreak'),
+                             lineage = c('BA2', 'BA1', 'Delta'))
 
-fill_color <- rev(ggsci::pal_nejm()(4))[-3]
+fig_2 <- ggplot(data = datafile_cout_sum)+
+        geom_col(mapping = aes(x = vaccine,
+                               y = n, 
+                               fill = vaccine_g),
+                 color = 'black',
+                 position = position_dodge2(width = 0.9, preserve = "single"),
+                 show.legend = T)+
+        geom_text(data = filter(datafile_label),
+                  mapping = aes(x = x,
+                                y = y,
+                                label = label),
+                  vjust = -0.2,
+                  family = 'Helvetica')+
+        facet_wrap(vars(factor(lineage, levels = c('BA2', 'BA1', 'Delta'))),
+                   nrow = 1,
+                   scales = 'free_y',
+                   labeller = as_labeller(c(
+                           Delta = 'i',
+                           BA1 = 'h',
+                           BA2 = 'g'
+                   )))+
+        scale_x_discrete(labels = c('Unfully Vaccinated', 'Fully Vaccinated', 'Booster Dose'),
+                         expand = c(0, 0.6),
+                         breaks = c('C', 'B', 'A'))+
+        scale_y_continuous(limits = c(0, 2500),
+                           expand = c(0, 0))+
+        scale_fill_manual(values = fill_color_1,
+                          labels = c('Sinopharm',
+                                     'Sinovac',
+                                     'Cansino',
+                                     'Sinopharm & Sinovac',
+                                     'Other',
+                                     'Unvaccined'),
+                          na.translate = F)+
+        coord_cartesian(clip = "off")+
+        theme_classic(base_family = 'Helvetica')+
+        theme(plot.title = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+              plot.margin = margin(0, 1, 0, 0.25, "cm"),
+              axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+              axis.text.y = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
+              axis.title.y = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
+              strip.text = element_text(size = 16, hjust = 0, vjust = .5, face = 'bold'),
+              strip.background = element_blank(),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              legend.position = 'bottom')+
+        labs(y = "Contacts",
+             x = '',
+             fill = 'Manufacturer')
 
-## plot ib -----------------------------------------------------------------
+# combined plot -----------------------------------------------------------
 
-datafile <- data.frame(
-     variant = c('Delta', 'BA.1', 'BA.2'),
-     mean = c(ib_delta$mu, ib_ba1$mu, ib_ba2$mu),
-     sd = c(ib_delta$sd, ib_ba1$sd, ib_ba2$sd)
-)
+cowplot::plot_grid(fig_1, fig_2, 
+                   ncol = 1,
+                   rel_heights = c(1.75, 1))
 
-fig_ib_inside <- ggplot(data = datafile,
-                        mapping = aes(x = variant,
-                                      y = mean,
-                                      fill = variant))+
-     geom_bar(stat="identity", color="black", 
-              position=position_dodge())+
-     geom_errorbar(mapping = aes(ymin=mean-sd, ymax=mean+sd), 
-                   width=.2,
-                   position=position_dodge())+
-     scale_fill_manual(values = fill_color,
-                       breaks = datafile$variant)+
-     scale_x_discrete(limits = datafile$variant)+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 12))+
-     theme_bw(base_family = 'Helvetica')+
-     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
-     labs(x = '',
-          y = '')+
-     guides(fill = 'none')
-
-fig_ib <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = ib_delta$distribution$parameters$shape, 
-                               scale = ib_delta$distribution$parameters$scale),
-                   mapping = aes(colour = 'Delta'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = ib_ba1$distribution$parameters$shape, 
-                               scale = ib_ba1$distribution$parameters$scale),
-                   mapping = aes(colour = 'BA.1'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = ib_ba2$distribution$parameters$shape, 
-                               scale = ib_ba2$distribution$parameters$scale),
-                   mapping = aes(colour = 'BA.2'))+
-     annotate(geom = 'text',
-              x = 7.5,
-              y = 0.4,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Incubation period of VOC')+
-     coord_cartesian(clip = "off")+
-     scale_color_manual(values = fill_color,
-                        breaks = datafile$variant)+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.4),
-                        labels = label_number(accuracy = 0.1))+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = '',
-          y = 'Relative frequency',
-          colour = '',
-          title = 'a')+
-     guides(color = 'none')
-
-fig_ib <- fig_ib + inset_element(fig_ib_inside, 0.4, 0.2, 1, 1)
-
-## plot si -----------------------------------------------------------------
-
-datafile <- data.frame(
-     variant = c('Delta', 'BA.1', 'BA.2'),
-     mean = c(si_delta$mean, si_ba1$mean, si_ba2$mean),
-     sd = c(si_delta$sd, si_ba1$sd, si_ba2$sd)
-)
-
-fig_si_inside <- ggplot(data = datafile,
-                        mapping = aes(x = variant,
-                                      y = mean,
-                                      fill = variant))+
-     geom_bar(stat="identity", color="black", 
-              position=position_dodge())+
-     geom_errorbar(mapping = aes(ymin=mean-sd, ymax=mean+sd), 
-                   width=.2,
-                   position=position_dodge())+
-     scale_fill_manual(values = fill_color,
-                       breaks = datafile$variant)+
-     scale_x_discrete(limits = datafile$variant)+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 12))+
-     theme_bw(base_family = 'Helvetica')+
-     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
-     labs(x = '',
-          y = '')+
-     guides(fill = 'none')
-
-fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = si_delta$shape, 
-                               rate = si_delta$rate),
-                   mapping = aes(colour = 'Delta'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = si_ba1$shape, 
-                               rate = si_ba1$rate),
-                   mapping = aes(colour = 'BA.1'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = si_ba2$shape, 
-                               rate = si_ba2$rate),
-                   mapping = aes(colour = 'BA.2'))+
-     annotate(geom = 'text',
-              x = 7.5,
-              y = 0.4,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Serial interval of VOC')+
-     coord_cartesian(clip = "off")+
-     scale_color_manual(values = fill_color,
-                        breaks = datafile$variant)+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.4),
-                        labels = label_number(accuracy = 0.1))+
-     labs(x = 'Time (days)',
-          y = 'Relative frequency',
-          colour = 'Variants',
-          title = 'c')+
-     theme_classic(base_family = 'Helvetica')+
-     theme(legend.position = 'bottom')+ 
-     guides(color = 'none')
-
-fig_si <- fig_si + 
-     inset_element(fig_si_inside, 0.4, 0.2, 1, 1)
-
-## plot tg -----------------------------------------------------------------
-
-datafile <- data.frame(
-     variant = c('Delta', 'BA.1', 'BA.2'),
-     shape = c(tg_delta$shape, tg_ba1$shape, tg_ba2$shape),
-     rate = c(tg_delta$rate, tg_ba1$rate, tg_ba2$rate)
-) |> 
-     mutate(mean = shape/rate,
-            sd = sqrt(shape)/rate)
-
-fig_tg_inside <- ggplot(data = datafile,
-                        mapping = aes(x = variant,
-                                      y = mean,
-                                      fill = variant))+
-     geom_bar(stat="identity", color="black", 
-              position=position_dodge())+
-     geom_errorbar(mapping = aes(ymin=ifelse(mean-sd < 0, 0.01, mean-sd), ymax=mean+sd), 
-                   width=.2,
-                   position=position_dodge())+
-     scale_fill_manual(values = fill_color,
-                       breaks = datafile$variant)+
-     scale_x_discrete(limits = datafile$variant)+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 12))+
-     theme_bw(base_family = 'Helvetica')+
-     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
-     labs(x = '',
-          y = '')+
-     guides(fill = 'none')
-
-fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_delta$shape, 
-                               rate = tg_delta$rate),
-                   mapping = aes(colour = 'Delta'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_ba1$shape, 
-                               rate = tg_ba1$rate),
-                   mapping = aes(colour = 'BA.1'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_ba2$shape, 
-                               rate = tg_ba2$rate),
-                   mapping = aes(colour = 'BA.2'))+
-     annotate(geom = 'text',
-              x = 7.5,
-              y = 0.5,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Transmission generation of VOC')+
-     coord_cartesian(clip = "off")+
-     scale_color_manual(values = fill_color,
-                        breaks = datafile$variant)+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.5),
-                        labels = label_number(accuracy = 0.1))+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = 'Time (days)',
-          y = '',
-          colour = '',
-          title = 'd')+
-     guides(color = 'none')
-
-fig_tg <- fig_tg + 
-     inset_element(fig_tg_inside, 0.4, 0.2, 1, 1)
-
-## plot gt -----------------------------------------------------------------
-
-datafile <- data.frame(
-     variant = c('Delta', 'BA.1', 'BA.2'),
-     shape = c(gt_delta$shape, gt_ba1$shape, gt_ba2$shape),
-     rate = c(gt_delta$rate, gt_ba1$rate, gt_ba2$rate)
-) |> 
-     mutate(mean = shape/rate,
-            sd = sqrt(shape)/rate)
-
-fig_gt_inside <- ggplot(data = datafile,
-                        mapping = aes(x = variant,
-                                      y = mean,
-                                      fill = variant))+
-     geom_bar(stat="identity", color="black", 
-              position=position_dodge())+
-     geom_errorbar(mapping = aes(ymin=ifelse(mean-sd < 0, 0.01, mean-sd), ymax=mean+sd), 
-                   width=.2,
-                   position=position_dodge())+
-     scale_fill_manual(values = fill_color,
-                       breaks = datafile$variant)+
-     scale_x_discrete(limits = datafile$variant)+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 12))+
-     theme_bw(base_family = 'Helvetica')+
-     theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5, face = 'plain', color = 'black'))+
-     labs(x = '',
-          y = '')+
-     guides(fill = 'none')
-
-fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_delta$shape, 
-                               rate = gt_delta$rate),
-                   mapping = aes(colour = 'Delta'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_ba1$shape, 
-                               rate = gt_ba1$rate),
-                   mapping = aes(colour = 'BA.1'))+
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_ba2$shape, 
-                               rate = gt_ba2$rate),
-                   mapping = aes(colour = 'BA.2'))+
-     annotate(geom = 'text',
-              x = 7.5,
-              y = 0.5,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Generation time (probable) of VOC')+
-     coord_cartesian(clip = "off")+
-     scale_color_manual(values = fill_color, 
-                        breaks = datafile$variant)+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.5),
-                        labels = label_number(accuracy = 0.1))+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = '',
-          y = '',
-          colour = '',
-          title = 'b')+
-     guides(color = 'none')
-
-fig_gt <- fig_gt + 
-     inset_element(fig_gt_inside, 0.4, 0.2, 1, 1)
-
-
-## plot differ -----------------------------------------------------------
-
-diff_delta <- diff_dis(si_delta$shape,si_delta$rate,
-                       ib_delta$distribution$parameters$shape,
-                       1 / ib_delta$distribution$parameters$scale,
-                       100000)
-diff_ba1 <- diff_dis(si_ba1$shape,si_ba1$rate,
-                     ib_ba1$distribution$parameters$shape,
-                     1 / ib_ba1$distribution$parameters$scale,
-                     100000)
-diff_ba2 <- diff_dis(si_ba2$shape,si_ba2$rate,
-                     ib_ba2$distribution$parameters$shape,
-                     1 / ib_ba2$distribution$parameters$scale,
-                     100000)
-
-datafile <- data.frame(
-     variant = rep(c('Delta', 'BA.1', 'BA.2'),
-                   each = 100000),
-     mean = c(diff_delta, diff_ba1, diff_ba2))
-datafile$variant <- factor(datafile$variant,
-                           levels = c('Delta', 'BA.1', 'BA.2'))
-
-fig_diff <- ggplot(datafile)+
-     geom_boxplot(mapping = aes(x = mean,
-                                y = variant),
-                  fill = fill_color)+
-     scale_x_continuous(expand = c(0, 0),
-                        limits = c(-5, 10))+
-     annotate(geom = 'text',
-              x = 2.5,
-              y = Inf,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Differ between SI and IP')+
-     coord_cartesian(clip = "off")+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = 'Time (days)',
-          y = '',
-          colour = '',
-          title = 'e')+
-     guides(fill = 'none')
-
-# plot Reff ---------------------------------------------------------------
-
-datafile <- data.frame(
-     variant = c('Delta', 'BA.1', 'BA.2'),
-     mean = c(r0_delta$R, r0_ba1$R, r0_ba2$R),
-     low_ci = c(r0_delta$conf.int[1], r0_ba1$conf.int[1], r0_ba2$conf.int[1]),
-     top_ci = c(r0_delta$conf.int[2], r0_ba1$conf.int[2], r0_ba2$conf.int[2])
-) |> 
-     mutate_if(is.numeric, round, digits = 2) |> 
-     mutate(labels = paste0(mean, 
-                            " (", low_ci, "-", top_ci, ")"))
-
-fig_reff <- ggplot(data = datafile,
-                   mapping = aes(y = variant,
-                                 x = mean,
-                                 fill = variant))+
-     geom_bar(stat="identity", color="black", 
-              position=position_dodge())+
-     geom_errorbar(mapping = aes(xmin=low_ci, xmax=top_ci), 
-                   width=.2,
-                   position=position_dodge())+
-     geom_text(aes(label = labels),
-               color = fill_color,
-               position = position_dodge(width = 0.7),
-               size = 10*5/14,
-               vjust = -1,
-               hjust = -0.1
-     )+
-     # annotate(geom = 'text',
-     #          x = 5,
-     #          y = Inf,
-     #          vjust = -0.7,
-     #          size = 11*5/14,
-     #          family = 'Helvetica',
-     #          label = 'Effective reproductive number')+
-     coord_cartesian(clip = "off")+
-     scale_fill_manual(values = fill_color,
-                       breaks = datafile$variant)+
-     scale_y_discrete(limits = datafile$variant)+
-     scale_x_continuous(expand = c(0, 0),
-                        limits = c(0, 10),
-                        breaks = seq(0, 10, 2))+
-     theme_classic(base_family = 'Helvetica')+
-     labs(x = 'Effective reproductive number',
-          y = '',
-          colour = '',
-          title = 'f')+
-     guides(fill = 'none')
-
-# multiplot ---------------------------------------------------------------
-
-fig <- fig_ib + fig_gt + fig_si + fig_tg + fig_diff + fig_reff+
-     plot_layout(ncol = 2, byrow = T) &
-     theme(axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
-           axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
-           axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
-           axis.title.y = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold'),
-           strip.text.x = element_text(size = 12, face = 'bold'),
-           strip.text.y = element_text(size = 12, face = 'bold'),
-           panel.grid.major = element_blank(), 
-           panel.grid.minor = element_blank(),
-           panel.background = element_blank(),
-           plot.margin = margin(1, 5, 1, 1),
-           plot.background = element_blank(),
-           plot.title = element_text(size = 16, hjust = 0, vjust = 0, face = 'bold'))
-
-fig
-
-ggsave(filename = './outcome/publish/Figure 3.pdf', 
-       height = 7, width = 7)
+ggsave(filename = './outcome/publish/Figure 3.pdf',
+       width = 14, height = 11)

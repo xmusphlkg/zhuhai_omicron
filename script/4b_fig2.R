@@ -109,13 +109,74 @@ diff_dis <- function(shape1, rate1, shape2, rate2, n){
      return(a - b)
 }
 
+# estimate IP -------------------------------------------------------------
+
+datafile_info <- datafile_info_BA1 %>% 
+     dplyr::select(dateonset, dateexpose1, dateexpose2, type, age) %>% 
+     mutate(date_seq_1 = dateonset - dateexpose1,
+            date_seq_2 = dateonset - dateexpose2) %>% 
+     filter(type != 'Asymptomatic')
+
+datafile_info$expose_date <- mapply(expose_date, datafile_info$dateexpose1, datafile_info$dateexpose2)
+
+ib_ba1 <- fit_gamma_incubation_dist(datafile_info, 
+                                    dateonset, 
+                                    dateexpose1,
+                                    dateexpose2)
+ib_ba1_c <- fit_gamma_incubation_dist(filter(datafile_info, age <= 18), 
+                                      dateonset, 
+                                      dateexpose1,
+                                      dateexpose2)
+ib_ba1_a <- fit_gamma_incubation_dist(filter(datafile_info, age > 18), 
+                                      dateonset, 
+                                      dateexpose1,
+                                      dateexpose2)
+
+datafile_BA2_ib <- datafile_info_BA2 %>% 
+     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type, age) %>% 
+     mutate(date_seq_1 = dateonset - dateexpose1,
+            date_seq_2 = dateonset - dateexpose2) %>% 
+     filter(type != 'Asymptomatic' & !is.na(date_seq_1))
+
+datafile_BA2_ib$expose_date <- mapply(expose_date, datafile_BA2_ib$dateexpose1, datafile_BA2_ib$dateexpose2)
+
+ib_ba2 <- fit_gamma_incubation_dist(datafile_BA2_ib, 
+                                    dateonset, 
+                                    dateexpose1,
+                                    dateexpose2) 
+ib_ba2_c <- NA
+ib_ba2_a <- fit_gamma_incubation_dist(filter(datafile_BA2_ib, age > 18), 
+                                      dateonset, 
+                                      dateexpose1,
+                                      dateexpose2)
+
+
+datafile_Delta_ib <- datafile_info_Delta %>% 
+     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type, age) %>% 
+     mutate(date_seq_1 = dateonset - dateexpose1,
+            date_seq_2 = dateonset - dateexpose2) %>% 
+     filter(type != 'Asymptomatic' & !is.na(date_seq_1))
+
+ib_delta <- fit_gamma_incubation_dist(datafile_Delta_ib,
+                                      dateonset,
+                                      dateexpose1,
+                                      dateexpose2)
+ib_delta_c <- fit_gamma_incubation_dist(filter(datafile_Delta_ib, age <= 18), 
+                                        dateonset, 
+                                        dateexpose1,
+                                        dateexpose2)
+ib_delta_a <- fit_gamma_incubation_dist(filter(datafile_Delta_ib, age > 18), 
+                                        dateonset, 
+                                        dateexpose1,
+                                        dateexpose2)
+
 # estimate SI -------------------------------------------------------------
 
 library(R0)
 
 datafile_onset <- datafile_info_BA1 %>% 
      filter(type != 'Asymptomatic') %>% 
-     dplyr::select(id, dateonset)
+     dplyr::select(id, dateonset, age)
 
 datafile_cont_1 <- datafile_chains_BA1 %>% 
      dplyr::select(to, from) %>% 
@@ -125,14 +186,14 @@ datafile_cont_1 <- datafile_chains_BA1 %>%
      )) %>% 
      left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
      rename('infectee_date' = dateonset) %>% 
-     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
+     left_join(datafile_onset[,-3], by = c('infector' = 'id')) %>% 
      rename('infector_date' = dateonset) %>% 
      mutate(date_sep = infectee_date - infector_date) %>% 
      filter(date_sep >=0)
 
 datafile_onset <- datafile_info_BA2 %>% 
      filter(type != 'Asymptomatic') %>% 
-     dplyr::select(id, dateonset)
+     dplyr::select(id, dateonset, age)
 
 datafile_cont_2 <- datafile_chains_BA2 %>% 
      dplyr::select(to, from) %>% 
@@ -142,14 +203,14 @@ datafile_cont_2 <- datafile_chains_BA2 %>%
      )) %>% 
      left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
      rename('infectee_date' = dateonset) %>% 
-     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
+     left_join(datafile_onset[,-3], by = c('infector' = 'id')) %>% 
      rename('infector_date' = dateonset) %>% 
      mutate(date_sep = infectee_date - infector_date) %>% 
      filter(date_sep >=0)
 
 datafile_onset <- datafile_info_Delta %>% 
      filter(type != 'Asymptomatic') %>% 
-     dplyr::select(id, dateonset)
+     dplyr::select(id, dateonset, age)
 
 datafile_cont_3 <- datafile_chains_Delta %>% 
      dplyr::select(to, from) %>% 
@@ -159,55 +220,297 @@ datafile_cont_3 <- datafile_chains_Delta %>%
      )) %>% 
      left_join(datafile_onset, by = c('infectee' = 'id')) %>% 
      rename('infectee_date' = dateonset) %>% 
-     left_join(datafile_onset, by = c('infector' = 'id')) %>% 
+     left_join(datafile_onset[,-3], by = c('infector' = 'id')) %>% 
      rename('infector_date' = dateonset) %>% 
      mutate(date_sep = infectee_date - infector_date) %>% 
      filter(date_sep >=0)
 
+si_ba1_gamma_c <- fit_best(data = as.numeric(filter(datafile_cont_1, age <= 18)$date_sep), 
+                           distribution.type = 'gamma')
+si_ba1_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_1, age > 18)$date_sep), 
+                           distribution.type = 'gamma')
 si_ba1_gamma <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
                          distribution.type = 'gamma')
 
+si_ba2_gamma_c <- NA
+si_ba2_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_2, age > 18)$date_sep), 
+                           distribution.type = 'gamma')
 si_ba2_gamma <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
                          distribution.type = 'gamma')
 
+si_delta_gamma_c <- fit_best(data = as.numeric(filter(datafile_cont_3, age <= 18)$date_sep), 
+                             distribution.type = 'gamma')
+si_delta_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_3, age > 18)$date_sep), 
+                             distribution.type = 'gamma')
 si_delta_gamma <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
                            distribution.type = 'gamma')
 
-si_ba1_lognormal <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
-                             distribution.type = 'lognormal')
+# estimate GT -------------------------------------------------------------
 
-si_ba2_lognormal <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
-                             distribution.type = 'lognormal')
+data_expose <- datafile_info_BA1 %>% 
+     dplyr::select(id, dateexpose1, dateexpose2, age)
 
-si_delta_lognormal <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
-                               distribution.type = 'lognormal')
+datafile_cont_1 <- datafile_chains_BA1 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(data_expose, by = c('infectee' = 'id')) %>% 
+     rename(c('infectee_exposedate1' = dateexpose1,
+              'infectee_exposedate2' = dateexpose2))%>% 
+     left_join(data_expose[,-4], by = c('infector' = 'id')) %>% 
+     rename(c('infector_exposedate1' = dateexpose1,
+              'infector_exposedate2' = dateexpose2))
 
-si_ba1_weibull <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
-                           distribution.type = 'weibull')
+datafile_expose_seq <- t(sapply(rownames(datafile_cont_1), 
+                                expose_seq, 
+                                data = datafile_cont_1))
 
-si_ba2_weibull <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
-                           distribution.type = 'weibull')
+datafile_cont_1 <- datafile_cont_1 %>% 
+     mutate(gt_min = datafile_expose_seq[,1],
+            gt_median = datafile_expose_seq[,2],
+            gt_max = datafile_expose_seq[,3])
 
-si_delta_weibull <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
-                             distribution.type = 'weibull')
 
-# plot --------------------------------------------------------------------
+data_expose <- datafile_info_BA2 %>% 
+     dplyr::select(id, dateexpose1, dateexpose2, age)
+
+datafile_cont_2 <- datafile_chains_BA2 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(data_expose, by = c('infectee' = 'id')) %>% 
+     rename(c('infectee_exposedate1' = dateexpose1,
+              'infectee_exposedate2' = dateexpose2))%>% 
+     left_join(data_expose[,-4], by = c('infector' = 'id')) %>% 
+     rename(c('infector_exposedate1' = dateexpose1,
+              'infector_exposedate2' = dateexpose2))
+
+datafile_expose_seq <- t(sapply(rownames(datafile_cont_2), 
+                                expose_seq, 
+                                data = datafile_cont_2))
+
+datafile_cont_2 <- datafile_cont_2 %>% 
+     mutate(gt_min = datafile_expose_seq[,1],
+            gt_median = datafile_expose_seq[,2],
+            gt_max = datafile_expose_seq[,3])
+
+data_expose <- datafile_info_Delta %>% 
+     dplyr::select(id, dateexpose1, dateexpose2, age)
+
+datafile_cont_3 <- datafile_chains_Delta %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(data_expose, by = c('infectee' = 'id')) %>% 
+     rename(c('infectee_exposedate1' = dateexpose1,
+              'infectee_exposedate2' = dateexpose2))%>% 
+     left_join(data_expose[,-4], by = c('infector' = 'id')) %>% 
+     rename(c('infector_exposedate1' = dateexpose1,
+              'infector_exposedate2' = dateexpose2)) |> 
+     filter(!is.na(infector_exposedate1) & !is.na(infectee_exposedate1)) |> 
+     mutate(gt_median = as.numeric(infectee_exposedate1 - infector_exposedate1),
+            gt_median = if_else(gt_median<0, 0, gt_median))
+
+datafile_expose_seq <- t(sapply(rownames(datafile_cont_3), 
+                                expose_seq, 
+                                data = datafile_cont_3))
+
+datafile_cont_3 <- datafile_cont_3 %>% 
+     mutate(gt_min = datafile_expose_seq[,1],
+            gt_median = datafile_expose_seq[,2],
+            gt_max = datafile_expose_seq[,3]) |> 
+     filter(!is.na(gt_median))
+
+gt_ba1_gamma_c <- fit_best(data = as.numeric(filter(datafile_cont_1, age <= 18)$gt_median), 
+                           distribution.type = 'gamma')
+gt_ba1_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_1, age > 18)$gt_median), 
+                           distribution.type = 'gamma')
+gt_ba1_gamma <- fit_best(data = as.numeric(datafile_cont_1$gt_median), 
+                         distribution.type = 'gamma')
+
+gt_ba2_gamma_c <- NA
+gt_ba2_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_2, age > 18)$gt_median), 
+                           distribution.type = 'gamma')
+gt_ba2_gamma <- fit_best(data = as.numeric(datafile_cont_2$gt_median), 
+                         distribution.type = 'gamma')
+
+gt_delta_gamma_c <- fit_best(data = as.numeric(filter(datafile_cont_3, age <= 18)$gt_median), 
+                             distribution.type = 'gamma')
+gt_delta_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_3, age > 18)$gt_median), 
+                             distribution.type = 'gamma')
+gt_delta_gamma <- fit_best(data = as.numeric(datafile_cont_3$gt_median), 
+                           distribution.type = 'gamma')
+
+# estimate TG -------------------------------------------------------------
+
+datafile_positive <- datafile_info_BA1 %>% 
+     dplyr::select(id, datepositive, age)
+
+datafile_cont_1 <- datafile_chains_BA1 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = datepositive) %>% 
+     left_join(datafile_positive[,-3], by = c('infector' = 'id')) %>% 
+     rename('infector_date' = datepositive) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+datafile_positive <- datafile_info_BA2 %>% 
+     dplyr::select(id, datepositive, age)
+
+datafile_cont_2 <- datafile_chains_BA2 %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = datepositive) %>% 
+     left_join(datafile_positive[,-3], by = c('infector' = 'id')) %>% 
+     rename('infector_date' = datepositive) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+datafile_positive <- datafile_info_Delta %>% 
+     dplyr::select(id, datepositive, age)
+
+datafile_cont_3 <- datafile_chains_Delta %>% 
+     dplyr::select(to, from) %>% 
+     rename(c(
+          'infectee' = 'to',
+          'infector' = 'from'
+     )) %>% 
+     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
+     rename('infectee_date' = datepositive) %>% 
+     left_join(datafile_positive[,-3], by = c('infector' = 'id')) %>% 
+     rename('infector_date' = datepositive) %>% 
+     mutate(date_sep = infectee_date - infector_date) %>% 
+     filter(date_sep >=0)
+
+tg_ba1_gamma_c <- fit_best(data = as.numeric(filter(datafile_cont_1, age <= 18)$date_sep), 
+                           distribution.type = 'gamma')
+tg_ba1_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_1, age > 18)$date_sep), 
+                           distribution.type = 'gamma')
+tg_ba1_gamma <- fit_best(data = as.numeric(datafile_cont_1$date_sep), distribution.type = 'gamma')
+
+tg_ba2_gamma_c <- NA
+tg_ba2_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_2, age > 18)$date_sep), 
+                           distribution.type = 'gamma')
+tg_ba2_gamma <- fit_best(data = as.numeric(datafile_cont_2$date_sep), distribution.type = 'gamma')
+
+tg_delta_gamma_c <- fit_best(data = as.numeric(filter(datafile_cont_3, age <= 18)$date_sep), 
+                             distribution.type = 'gamma')
+tg_delta_gamma_a <- fit_best(data = as.numeric(filter(datafile_cont_3, age > 18)$date_sep), 
+                             distribution.type = 'gamma')
+tg_delta_gamma <- fit_best(data = as.numeric(datafile_cont_3$date_sep), distribution.type = 'gamma')
+
+
+# plot IP -----------------------------------------------------------------
 
 fig_a <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = si_ba2_gamma$shape, rate = si_ba2_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = si_ba2_lognormal$meanlog, sdlog = si_ba2_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = si_ba2_weibull$shape, scale = si_ba2_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_2,
-                    mapping = aes(x = date_sep, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
+                   args = list(shape = ib_ba2$distribution$parameters$shape, 
+                               scale = ib_ba2$distribution$parameters$scale),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_ba2_a$distribution$parameters$shape, 
+                               scale = ib_ba2_a$distribution$parameters$scale),
+                   mapping = aes(colour = 'B')) +
+     # stat_function(fun = dgamma, n = 100,
+     #               args = list(shape = ib_ba2_c$distribution$parameters$shape, 
+     #                           scale = ib_ba2_c$distribution$parameters$scale),
+     #               mapping = aes(colour = 'C')) +
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.3,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Incubation period')+
+     coord_cartesian(clip = "off")+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.3),
+                        labels = label_number(accuracy = 0.01))+
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     labs(x = '',
+          y = 'Relative frequency',
+          colour = '',
+          title = 'a')+
+     guides(colour = 'none')
+
+fig_e <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_ba1$distribution$parameters$shape, 
+                               scale = ib_ba1$distribution$parameters$scale),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_ba1_a$distribution$parameters$shape, 
+                               scale = ib_ba1_a$distribution$parameters$scale),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_ba1_c$distribution$parameters$shape,
+                               scale = ib_ba1_c$distribution$parameters$scale),
+                   mapping = aes(colour = 'C')) +
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+                        labels = label_number(accuracy = 0.01))+
+     labs(x = '',
+          y = 'Relative frequency',
+          colour = '',
+          title = 'e')
+
+fig_i <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_delta$distribution$parameters$shape, 
+                               scale = ib_delta$distribution$parameters$scale),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_delta_a$distribution$parameters$shape, 
+                               scale = ib_delta_a$distribution$parameters$scale),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = ib_delta_c$distribution$parameters$shape,
+                               scale = ib_delta_c$distribution$parameters$scale),
+                   mapping = aes(colour = 'C')) +
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+                        labels = label_number(accuracy = 0.01))+
+     labs(x = 'Time (days)',
+          y = 'Relative frequency',
+          colour = '',
+          title = 'i')
+
+# plot SI -----------------------------------------------------------------
+
+fig_b <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba2_gamma$shape, 
+                               rate = si_ba2_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba2_gamma_a$shape, 
+                               rate = si_ba2_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     # stat_function(fun = dgamma, n = 100,
+     #               args = list(shape = si_ba2_gamma_c$shape, 
+     #                           rate = si_ba2_gamma_c$rate),
+     #               mapping = aes(colour = 'C')) +
      annotate(geom = 'text',
               x = 7.5,
               y = 0.4,
@@ -216,689 +519,257 @@ fig_a <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               family = 'Helvetica',
               label = 'Serial interval')+
      coord_cartesian(clip = "off")+
-     scale_colour_npg()+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(limits = c(0, 0.4),
-                        expand = c(0, 0),
-                        labels = label_number(accuracy = 0.01))+
-     labs(x = '',
-          y = 'Relative frequency',
-          colour = 'Fitted distribution',
-          title = 'a')
-
-table_a <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(si_ba2_gamma$shape,2),
-                     ', ', round(si_ba2_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(si_ba2_lognormal$mean, 2), 
-                     ', ', round(si_ba2_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(si_ba2_weibull$shape,2), 
-                     ', ', round(si_ba2_weibull$scale, 2), ')')),
-     loglike = round(c(si_ba2_gamma$loglik,
-                       si_ba2_lognormal$loglik,
-                       si_ba2_weibull$loglik),
-                     2))
-names(table_a)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_a <- tableGrob(table_a,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_a <- fig_a +
-     inset_element(table_a, 0.95, 0.7, 0.4, 0.75)
-
-fig_d <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = si_ba1_gamma$shape, rate = si_ba1_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = si_ba1_lognormal$meanlog, sdlog = si_ba1_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = si_ba1_weibull$shape, scale = si_ba1_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_1,
-                    mapping = aes(x = date_sep, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
-     scale_colour_npg()+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(limits = c(0, 0.4),
-                        expand = c(0, 0),
-                        labels = label_number(accuracy = 0.01))+
-     labs(x = '',
-          y = 'Relative frequency',
-          colour = 'Fitted distribution',
-          title = 'd')
-
-table_d <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(si_ba1_gamma$shape,2),
-                     ', ', round(si_ba1_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(si_ba1_lognormal$mean, 2), 
-                     ', ', round(si_ba1_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(si_ba1_weibull$shape,2), 
-                     ', ', round(si_ba1_weibull$scale, 2), ')')),
-     loglike = round(c(si_ba1_gamma$loglik,
-                       si_ba1_lognormal$loglik,
-                       si_ba1_weibull$loglik),
-                     2))
-names(table_d)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_d <- tableGrob(table_d,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_d <- fig_d +
-     inset_element(table_d, 0.95, 0.7, 0.4, 0.75)
-
-fig_g <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = si_delta_gamma$shape, rate = si_delta_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = si_delta_lognormal$meanlog, sdlog = si_delta_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = si_delta_weibull$shape, scale = si_delta_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_3,
-                    mapping = aes(x = date_sep, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
-     scale_colour_npg()+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0),
-                        limits = c(0, 15))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.3),
-                        labels = label_number(accuracy = 0.01))+
-     labs(x = 'Time (days)',
-          y = 'Relative frequency',
-          colour = 'Fitted distribution',
-          title = 'g')
-
-table_g <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(si_delta_gamma$shape,2),
-                     ', ', round(si_delta_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(si_delta_lognormal$mean, 2), 
-                     ', ', round(si_delta_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(si_delta_weibull$shape,2), 
-                     ', ', round(si_delta_weibull$scale, 2), ')')),
-     loglike = round(c(si_delta_gamma$loglik,
-                       si_delta_lognormal$loglik,
-                       si_delta_weibull$loglik),
-                     2))
-names(table_g)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_g <- tableGrob(table_g,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_g <- fig_g +
-     inset_element(table_g, 0.95, 0.7, 0.4, 0.75)
-
-fig_a / fig_d / fig_g
-
-# estimate TG -------------------------------------------------------------
-
-datafile_positive <- datafile_info_BA1 %>% 
-     dplyr::select(id, datepositive)
-
-datafile_cont_1 <- datafile_chains_BA1 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = datepositive) %>% 
-     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = datepositive) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
-
-datafile_positive <- datafile_info_BA2 %>% 
-     dplyr::select(id, datepositive)
-
-datafile_cont_2 <- datafile_chains_BA2 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = datepositive) %>% 
-     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = datepositive) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
-
-datafile_positive <- datafile_info_Delta %>% 
-     dplyr::select(id, datepositive)
-
-datafile_cont_3 <- datafile_chains_Delta %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(datafile_positive, by = c('infectee' = 'id')) %>% 
-     rename('infectee_date' = datepositive) %>% 
-     left_join(datafile_positive, by = c('infector' = 'id')) %>% 
-     rename('infector_date' = datepositive) %>% 
-     mutate(date_sep = infectee_date - infector_date) %>% 
-     filter(date_sep >=0)
-
-tg_ba1_gamma <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
-                         distribution.type = 'gamma')
-
-tg_ba2_gamma <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
-                         distribution.type = 'gamma')
-
-tg_delta_gamma <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
-                           distribution.type = 'gamma')
-
-tg_ba1_lognormal <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
-                             distribution.type = 'lognormal')
-
-tg_ba2_lognormal <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
-                             distribution.type = 'lognormal')
-
-tg_delta_lognormal <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
-                               distribution.type = 'lognormal')
-
-tg_ba1_weibull <- fit_best(data = as.numeric(datafile_cont_1$date_sep), 
-                           distribution.type = 'weibull')
-
-tg_ba2_weibull <- fit_best(data = as.numeric(datafile_cont_2$date_sep), 
-                           distribution.type = 'weibull')
-
-tg_delta_weibull <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
-                             distribution.type = 'weibull')
-
-# plot --------------------------------------------------------------------
-
-# fig_b <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-#      stat_function(fun = dgamma, n = 100,
-#                    args = list(shape = tg_ba2_gamma$shape, rate = tg_ba2_gamma$rate),
-#                    mapping = aes(colour = 'Gamma')) +
-#      stat_function(fun = dlnorm, n = 100,
-#                    args = list(meanlog = tg_ba2_lognormal$meanlog, sdlog = tg_ba2_lognormal$sdlog),
-#                    mapping = aes(colour = 'Log-normal')) +
-#      stat_function(fun = dweibull, n = 100,
-#                    args = list(shape = tg_ba2_weibull$shape, scale = tg_ba2_weibull$scale),
-#                    mapping = aes(colour = 'Weibull')) +
-#      geom_histogram(data = datafile_cont_2,
-#                     mapping = aes(x = date_sep, y=..density..),
-#                     breaks = 0:15,
-#                     fill = 'gray',
-#                     alpha = 0.5)+
-#      scale_colour_npg()+
-#      scale_x_continuous(breaks = seq(0, 15, 3),
-#                         expand = c(0, 0))+
-#      scale_y_continuous(expand = expansion(mult = c(0, .1)),
-#                         labels = label_number(accuracy = 0.01))+
-#      labs(x = 'Time (days)',
-#           y = 'Relative frequency',
-#           colour = 'Fitted distribution',
-#           title = 'b   TG Omicron BA.2')
-
-fig_b <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_ba2_gamma$shape, rate = tg_ba2_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = tg_ba2_lognormal$meanlog, sdlog = tg_ba2_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = tg_ba2_weibull$shape, scale = tg_ba2_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_2,
-                    mapping = aes(x = date_sep, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
-     annotate(geom = 'text',
-              x = 7.5,
-              y = 0.5,
-              vjust = -0.7,
-              size = 11*5/14,
-              family = 'Helvetica',
-              label = 'Transmission generation (probable)')+
-     coord_cartesian(clip = "off")+
-     scale_colour_npg()+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(limits = c(0, 0.5),
-                        expand = c(0, 0),
-                        labels = label_number(accuracy = 0.01))+
-     labs(x = '',
-          y = '',
-          colour = 'Fitted distribution',
-          title = 'b')
-
-table_b <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(tg_ba2_gamma$shape,2),
-                     ', ', round(tg_ba2_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(tg_ba2_lognormal$mean, 2), 
-                     ', ', round(tg_ba2_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(tg_ba2_weibull$shape,2), 
-                     ', ', round(tg_ba2_weibull$scale, 2), ')')),
-     loglike = round(c(tg_ba2_gamma$loglik,
-                       tg_ba2_lognormal$loglik,
-                       tg_ba2_weibull$loglik),
-                     2))
-names(table_b)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_b <- tableGrob(table_b,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_b <- fig_b +
-     inset_element(table_b, 0.95, 0.7, 0.4, 0.75)
-
-fig_e <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_ba1_gamma$shape, rate = tg_ba1_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = tg_ba1_lognormal$meanlog, sdlog = tg_ba1_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = tg_ba1_weibull$shape, scale = tg_ba1_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_1,
-                    mapping = aes(x = date_sep, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
-     scale_colour_npg()+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
-     scale_y_continuous(limits = c(0, 0.4),
-                        expand = c(0, 0),
-                        labels = label_number(accuracy = 0.01))+
-     labs(x = '',
-          y = '',
-          colour = 'Fitted distribution',
-          title = 'e')
-
-table_e <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(tg_ba1_gamma$shape,2),
-                     ', ', round(tg_ba1_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(tg_ba1_lognormal$mean, 2), 
-                     ', ', round(tg_ba1_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(tg_ba1_weibull$shape,2), 
-                     ', ', round(tg_ba1_weibull$scale, 2), ')')),
-     loglike = round(c(tg_ba1_gamma$loglik,
-                       tg_ba1_lognormal$loglik,
-                       tg_ba1_weibull$loglik),
-                     2))
-names(table_e)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_e <- tableGrob(table_e,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_e <- fig_e +
-     inset_element(table_e, 0.95, 0.7, 0.4, 0.75)
-
-fig_h <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
-     stat_function(fun = dgamma, n = 100,
-                   args = list(shape = tg_delta_gamma$shape, rate = tg_delta_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = tg_delta_lognormal$meanlog, sdlog = tg_delta_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = tg_delta_weibull$shape, scale = tg_delta_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_3,
-                    mapping = aes(x = date_sep, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
-     scale_colour_npg()+
-     scale_x_continuous(breaks = seq(0, 15, 3),
-                        expand = c(0, 0))+
      scale_y_continuous(expand = c(0, 0),
                         limits = c(0, 0.4),
                         labels = label_number(accuracy = 0.01))+
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     labs(x = '',
+          y = '',
+          colour = '',
+          title = 'b')+
+     guides(colour = 'none')
+
+fig_f <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba1_gamma$shape, 
+                               rate = si_ba1_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba1_gamma_a$shape, 
+                               rate = si_ba1_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_ba1_gamma_c$shape,
+                               rate = si_ba1_gamma_c$rate),
+                   mapping = aes(colour = 'C')) +
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+                        labels = label_number(accuracy = 0.01))+
+     labs(x = '',
+          y = '',
+          colour = '',
+          title = 'f')
+
+fig_j <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_delta_gamma$shape, 
+                               rate = si_delta_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_delta_gamma_a$shape, 
+                               rate = si_delta_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = si_delta_gamma_c$shape,
+                               rate = si_delta_gamma_c$rate),
+                   mapping = aes(colour = 'C')) +
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+                        labels = label_number(accuracy = 0.01))+
      labs(x = 'Time (days)',
           y = '',
-          colour = 'Fitted distribution',
-          title = 'h')
-
-table_h <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(tg_delta_gamma$shape,2),
-                     ', ', round(tg_delta_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(tg_delta_lognormal$mean, 2), 
-                     ', ', round(tg_delta_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(tg_delta_weibull$shape,2), 
-                     ', ', round(tg_delta_weibull$scale, 2), ')')),
-     loglike = round(c(tg_delta_gamma$loglik,
-                       tg_delta_lognormal$loglik,
-                       tg_delta_weibull$loglik),
-                     2))
-names(table_h)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_h <- tableGrob(table_h,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_h <- fig_h +
-     inset_element(table_h, 0.95, 0.7, 0.4, 0.75)
-
-fig_b / fig_e / fig_h
-
-# estimate GT -------------------------------------------------------------
-
-data_expose <- datafile_info_BA1 %>% 
-     dplyr::select(id, dateexpose1, dateexpose2)
-
-datafile_cont_1 <- datafile_chains_BA1 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(data_expose, by = c('infectee' = 'id')) %>% 
-     rename(c('infectee_exposedate1' = dateexpose1,
-              'infectee_exposedate2' = dateexpose2))%>% 
-     left_join(data_expose, by = c('infector' = 'id')) %>% 
-     rename(c('infector_exposedate1' = dateexpose1,
-              'infector_exposedate2' = dateexpose2))
-
-datafile_expose_seq <- t(sapply(rownames(datafile_cont_1), expose_seq, 
-                                data = datafile_cont_1))
-
-datafile_cont_1 <- datafile_cont_1 %>% 
-     mutate(gt_min = datafile_expose_seq[,1],
-            gt_median = datafile_expose_seq[,2],
-            gt_max = datafile_expose_seq[,3])
-
-gt_ba1_gamma <- fit_best(as.numeric(datafile_cont_1$gt_median), "gamma")
-gt_ba1_lognormal <- fit_best(as.numeric(datafile_cont_1$gt_median), "lognormal")
-gt_ba1_weibull <- fit_best(as.numeric(datafile_cont_1$gt_median), "weibull")
-
-data_expose <- datafile_info_BA2 %>% 
-     dplyr::select(id, dateexpose1, dateexpose2)
-
-datafile_cont_2 <- datafile_chains_BA2 %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(data_expose, by = c('infectee' = 'id')) %>% 
-     rename(c('infectee_exposedate1' = dateexpose1,
-              'infectee_exposedate2' = dateexpose2))%>% 
-     left_join(data_expose, by = c('infector' = 'id')) %>% 
-     rename(c('infector_exposedate1' = dateexpose1,
-              'infector_exposedate2' = dateexpose2))
-
-datafile_expose_seq <- t(sapply(rownames(datafile_cont_2), expose_seq, 
-                                data = datafile_cont_2))
-
-datafile_cont_2 <- datafile_cont_2 %>% 
-     mutate(gt_min = datafile_expose_seq[,1],
-            gt_median = datafile_expose_seq[,2],
-            gt_max = datafile_expose_seq[,3])
-
-gt_ba2_gamma <- fit_best(as.numeric(datafile_cont_2$gt_median), "gamma")
-gt_ba2_lognormal <- fit_best(as.numeric(datafile_cont_2$gt_median), "lognormal")
-gt_ba2_weibull <- fit_best(as.numeric(datafile_cont_2$gt_median), "weibull")
-
-data_expose <- datafile_info_Delta %>% 
-     dplyr::select(id, dateexpose1, dateexpose2)
-
-datafile_cont_3 <- datafile_chains_Delta %>% 
-     dplyr::select(to, from) %>% 
-     rename(c(
-          'infectee' = 'to',
-          'infector' = 'from'
-     )) %>% 
-     left_join(data_expose, by = c('infectee' = 'id')) %>% 
-     rename(c('infectee_exposedate1' = dateexpose1,
-              'infectee_exposedate2' = dateexpose2))%>% 
-     left_join(data_expose, by = c('infector' = 'id')) %>% 
-     rename(c('infector_exposedate1' = dateexpose1,
-              'infector_exposedate2' = dateexpose2)) |> 
-     filter(!is.na(infector_exposedate1) & !is.na(infectee_exposedate1)) |> 
-     mutate(gt_median = as.numeric(infectee_exposedate1 - infector_exposedate1),
-            gt_median = if_else(gt_median<0, 0, gt_median))
-
-gt_delta_gamma <- fit_best(as.numeric(datafile_cont_3$gt_median), "gamma")
-gt_delta_lognormal <- fit_best(as.numeric(datafile_cont_3$gt_median), "lognormal")
-gt_delta_weibull <- fit_best(as.numeric(datafile_cont_3$gt_median), "weibull")
-
-# plot --------------------------------------------------------------------
+          colour = '',
+          title = 'j')
+# plot TG -----------------------------------------------------------------
 
 fig_c <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_ba2_gamma$shape, rate = gt_ba2_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = gt_ba2_lognormal$meanlog, sdlog = gt_ba2_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = gt_ba2_weibull$shape, scale = gt_ba2_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_2,
-                    mapping = aes(x = gt_median, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
+                   args = list(shape = tg_ba2_gamma$shape, 
+                               rate = tg_ba2_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_ba2_gamma_a$shape, 
+                               rate = tg_ba2_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     # stat_function(fun = dgamma, n = 100,
+     #               args = list(shape = tg_ba2_gamma_c$shape, 
+     #                           rate = tg_ba2_gamma_c$rate),
+     #               mapping = aes(colour = 'C')) +
      annotate(geom = 'text',
               x = 7.5,
               y = 0.5,
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Generation time')+
+              label = 'Transmission generation')+
+     coord_cartesian(clip = "off")+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.5),
+                        labels = label_number(accuracy = 0.01))+
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     labs(x = '',
+          y = '',
+          colour = '',
+          title = 'c')+
+     guides(colour = 'none')
+
+fig_g <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_ba1_gamma$shape, 
+                               rate = tg_ba1_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_ba1_gamma_a$shape, 
+                               rate = tg_ba1_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_ba1_gamma_c$shape,
+                               rate = tg_ba1_gamma_c$rate),
+                   mapping = aes(colour = 'C')) +
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+                        labels = label_number(accuracy = 0.01))+
+     labs(x = '',
+          y = '',
+          colour = '',
+          title = 'g')
+
+fig_k <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_delta_gamma$shape, 
+                               rate = tg_delta_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_delta_gamma_a$shape, 
+                               rate = tg_delta_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = tg_delta_gamma_c$shape,
+                               rate = tg_delta_gamma_c$rate),
+                   mapping = aes(colour = 'C')) +
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
+     scale_x_continuous(breaks = seq(0, 15, 3),
+                        expand = c(0, 0))+
+     scale_y_continuous(expand = expansion(mult = c(0, .1)),
+                        labels = label_number(accuracy = 0.01))+
+     labs(x = 'Time (days)',
+          y = '',
+          colour = '',
+          title = 'k')
+
+# plot GT -----------------------------------------------------------------
+
+fig_d <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_ba2_gamma$shape, 
+                               rate = gt_ba2_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_ba2_gamma_a$shape, 
+                               rate = gt_ba2_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     # stat_function(fun = dgamma, n = 100,
+     #               args = list(shape = gt_ba2_gamma_c$shape, 
+     #                           rate = gt_ba2_gamma_c$rate),
+     #               mapping = aes(colour = 'C')) +
+     annotate(geom = 'text',
+              x = 7.5,
+              y = 0.4,
+              vjust = -0.7,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Generation time (probable)')+
      annotate(geom = 'text',
               x = 15,
-              y = 0.25,
-              vjust = -2,
+              y = 0.2,
+              vjust = -0.7,
               size = 11*5/14,
               angle = -90,
               family = 'Helvetica',
               label = 'Omicron BA.2')+
      coord_cartesian(clip = "off")+
-     scale_colour_npg()+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.4),
+                        labels = label_number(accuracy = 0.01))+
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.5),
-                        labels = label_number(accuracy = 0.01))+
      labs(x = '',
           y = '',
-          colour = 'Fitted distribution',
-          title = 'c')
+          colour = '',
+          title = 'd')+
+     guides(colour = 'none')
 
-
-table_c <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(gt_ba2_gamma$shape,2),
-                     ', ', round(gt_ba2_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(gt_ba2_lognormal$mean, 2), 
-                     ', ', round(gt_ba2_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(gt_ba2_weibull$shape,2), 
-                     ', ', round(gt_ba2_weibull$scale, 2), ')')),
-     loglike = round(c(gt_ba2_gamma$loglik,
-                       gt_ba2_lognormal$loglik,
-                       gt_ba2_weibull$loglik),
-                     2))
-names(table_c)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_c <- tableGrob(table_c,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_c <- fig_c +
-     inset_element(table_c, 0.95, 0.7, 0.4, 0.75)
-
-fig_f <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+fig_h <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_ba1_gamma$shape, rate = gt_ba1_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = gt_ba1_lognormal$meanlog, sdlog = gt_ba1_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = gt_ba1_weibull$shape, scale = gt_ba1_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_1,
-                    mapping = aes(x = gt_median, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
+                   args = list(shape = gt_ba1_gamma$shape, 
+                               rate = gt_ba1_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_ba1_gamma_a$shape, 
+                               rate = gt_ba1_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_ba1_gamma_c$shape,
+                               rate = gt_ba1_gamma_c$rate),
+                   mapping = aes(colour = 'C')) +
      annotate(geom = 'text',
               x = 15,
-              y = 0.3,
-              vjust = -2,
+              y = 0.35,
+              vjust = -0.7,
               size = 11*5/14,
               angle = -90,
               family = 'Helvetica',
               label = 'Omicron BA.1')+
      coord_cartesian(clip = "off")+
-     scale_colour_npg()+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.7),
+                        labels = label_number(accuracy = 0.01))+
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.6),
-                        labels = label_number(accuracy = 0.01))+
      labs(x = '',
           y = '',
-          colour = 'Fitted distribution',
-          title = 'f')
+          colour = '',
+          title = 'h')
 
-table_f <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(gt_ba1_gamma$shape,2),
-                     ', ', round(gt_ba1_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(gt_ba1_lognormal$mean, 2), 
-                     ', ', round(gt_ba1_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(gt_ba1_weibull$shape,2), 
-                     ', ', round(gt_ba1_weibull$scale, 2), ')')),
-     loglike = round(c(gt_ba1_gamma$loglik,
-                       gt_ba1_lognormal$loglik,
-                       gt_ba1_weibull$loglik),
-                     2))
-names(table_f)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_f <- tableGrob(table_f,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_f <- fig_f +
-     inset_element(table_f, 0.95, 0.7, 0.4, 0.75)
-
-fig_i <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
+fig_l <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      stat_function(fun = dgamma, n = 100,
-                   args = list(shape = gt_delta_gamma$shape, rate = gt_delta_gamma$rate),
-                   mapping = aes(colour = 'Gamma')) +
-     stat_function(fun = dlnorm, n = 100,
-                   args = list(meanlog = gt_delta_lognormal$meanlog, sdlog = gt_delta_lognormal$sdlog),
-                   mapping = aes(colour = 'Log-normal')) +
-     stat_function(fun = dweibull, n = 100,
-                   args = list(shape = gt_delta_weibull$shape, scale = gt_delta_weibull$scale),
-                   mapping = aes(colour = 'Weibull')) +
-     geom_histogram(data = datafile_cont_3,
-                    mapping = aes(x = gt_median, y=..density..),
-                    breaks = 0:15,
-                    fill = 'gray',
-                    alpha = 0.5)+
+                   args = list(shape = gt_delta_gamma$shape, 
+                               rate = gt_delta_gamma$rate),
+                   mapping = aes(colour = 'A')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_delta_gamma_a$shape, 
+                               rate = gt_delta_gamma_a$rate),
+                   mapping = aes(colour = 'B')) +
+     stat_function(fun = dgamma, n = 100,
+                   args = list(shape = gt_delta_gamma_c$shape,
+                               rate = gt_delta_gamma_c$rate),
+                   mapping = aes(colour = 'C')) +
      annotate(geom = 'text',
               x = 15,
-              y = 0.25,
-              vjust = -2,
+              y = 0.3,
+              vjust = -0.7,
               size = 11*5/14,
               angle = -90,
               family = 'Helvetica',
               label = 'Delta')+
      coord_cartesian(clip = "off")+
-     scale_colour_npg()+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.6),
+                        labels = label_number(accuracy = 0.01))+
+     scale_colour_nejm(labels = c('Total', '19-', '0-18'))+
      scale_x_continuous(breaks = seq(0, 15, 3),
                         expand = c(0, 0))+
-     scale_y_continuous(expand = c(0, 0),
-                        limits = c(0, 0.5),
-                        labels = label_number(accuracy = 0.01))+
      labs(x = 'Time (days)',
           y = '',
-          colour = 'Fitted distribution',
-          title = 'i')
-
-table_i <- data.frame(
-     Distribution = c('Gamma', 'Log-normal', 'Weibull'),
-     para = c(paste0('Y ~ Gamma(', round(gt_delta_gamma$shape,2),
-                     ', ', round(gt_delta_gamma$rate, 2), ')'),
-              paste0('ln(Y) ~ Normal(', round(gt_delta_lognormal$mean, 2), 
-                     ', ', round(gt_delta_lognormal$sd, 2), ')'),
-              paste0('Y~Weibull(', round(gt_delta_weibull$shape,2), 
-                     ', ', round(gt_delta_weibull$scale, 2), ')')),
-     loglike = round(c(gt_delta_gamma$loglik,
-                       gt_delta_lognormal$loglik,
-                       gt_delta_weibull$loglik),
-                     2))
-names(table_i)[2:3] <- c('Parameter', 'Logarithmic\nlikelihood')
-
-table_i <- tableGrob(table_i,
-                     rows = NULL,
-                     theme = ttheme_default(
-                          base_size = 6,
-                          core = list(fg_params = list(col = ggsci::pal_npg()(3))),
-                          base_family = 'Helvetica'
-                     ))
-
-fig_i <- fig_i +
-     inset_element(table_i, 0.95, 0.7, 0.4, 0.75)
+          colour = '',
+          title = 'l')
 
 # combined plot -----------------------------------------------------------
 
-fig <- fig_a + fig_b + fig_c + fig_d + fig_e + fig_f + fig_g + fig_h + fig_i+
-     plot_layout(guides = 'collect', ncol = 3) &
+fig_a + fig_b +fig_c + fig_d + fig_e + fig_f + fig_g + fig_h + fig_i + fig_j + fig_k + fig_l +
+     plot_layout(guides = 'collect', ncol = 4)&
      theme_classic(base_family = 'Helvetica')+
      theme(axis.text.x = element_text(size = 10, hjust = .5, vjust = 0.5, face = 'plain', color = 'black'),
            axis.text.y = element_text(size = 10, hjust = 0, vjust = .5, face = 'plain', color = 'black'),
@@ -917,8 +788,6 @@ fig <- fig_a + fig_b + fig_c + fig_d + fig_e + fig_f + fig_g + fig_h + fig_i+
            legend.margin=margin(0,5,0,0),
            legend.background = element_rect(fill = "transparent", colour = 'transparent'),
            legend.position = 'bottom')
-
-fig
 
 ggsave(filename = './outcome/publish/extend/Figure S2.pdf', 
        height = 8, width = 12)
