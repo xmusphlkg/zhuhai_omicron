@@ -678,7 +678,7 @@ fig_d <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Generation time (probable)')+
+              label = 'Generation time(probability)')+
      annotate(geom = 'text',
               x = 15,
               y = 0.2,

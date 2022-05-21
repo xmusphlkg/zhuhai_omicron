@@ -402,6 +402,20 @@ save(si_ba1, si_ba2, si_delta,
      r0_ba1, r0_ba2, r0_delta, 
      file = './outcome/base/para.RData')
 
+# outcome <- data.frame(
+#         name = c('Incubation period', 'Serial interval',
+#                  'Transmission generation',
+#                  'Generation time (probability)',
+#                  'Effective reproductive number'),
+#         shape = c(time_ib_shape, time_si_shape, tg$estimate[1],
+#                   gt_max$estimate[1], gt_min$estimate[1]),
+#         rate = c(time_ib_scale, time_si_rate, tg$estimate[2],
+#                  gt_max$estimate[2], gt_min$estimate[2])
+# )
+
+# write.csv(outcome, paste0('./outcome/base/parameter distribution.csv'),
+#           quote = F, row.names = F)
+
 # plot --------------------------------------------------------------------
 
 library(cowplot)
@@ -456,7 +470,7 @@ fig_ib <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Incubation period of VOC')+
+              label = 'Incubation period')+
      coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color,
                         breaks = datafile$variant)+
@@ -522,7 +536,7 @@ fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Serial interval of VOC')+
+              label = 'Serial interval')+
      coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color,
                         breaks = datafile$variant)+
@@ -592,7 +606,7 @@ fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Transmission generation of VOC')+
+              label = 'Transmission generation')+
      coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color,
                         breaks = datafile$variant)+
@@ -661,7 +675,7 @@ fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Generation time (probable) of VOC')+
+              label = 'Generation time (probability)')+
      coord_cartesian(clip = "off")+
      scale_color_manual(values = fill_color, 
                         breaks = datafile$variant)+

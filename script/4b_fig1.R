@@ -482,7 +482,7 @@ fig_b <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
               vjust = -0.7,
               size = 11*5/14,
               family = 'Helvetica',
-              label = 'Transmission generation (probable)')+
+              label = 'Transmission generation (probability)')+
      coord_cartesian(clip = "off")+
      scale_colour_npg()+
      scale_x_continuous(breaks = seq(0, 15, 3),
