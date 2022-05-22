@@ -7,6 +7,7 @@ library(patchwork)
 library(ggsci)
 library(ggpubr)
 library(survival)
+library(boot)
 
 remove(list = ls())
 
@@ -19,6 +20,8 @@ font_add('Helvetica',
 
 fill_color <- rev(pal_nejm()(4))[-3]
 fill_color_1 <- c('#F1EB58FF', '#AA812DFF', '#283F99FF')
+
+set.seed(202205)
 
 # Ct value ----------------------------------------------------------------
 
@@ -284,15 +287,18 @@ datafile_cont <- rbind(datafile_cont_Delta,
                                  0,
                                  vaccine - 1),
                vaccine_mix = if_else(vaccine_mix == 'Y', 1, 0),
-               vaccine_g = case_when(
-                       vaccine == 0 ~ 0,
-                       vaccine == 1 & vaccine_mix ==0 ~ 1,
-                       vaccine == 1 & vaccine_mix ==1 ~ 3,
-                       vaccine == 2 & vaccine_mix ==0 ~ 2,
-                       vaccine == 2 & vaccine_mix ==1 ~ 4,
-                       TRUE ~ as.numeric(vaccine)
-               ),
+               # vaccine_g = case_when(
+               #         vaccine == 0 ~ 0,
+               #         vaccine == 1 & vaccine_mix ==0 ~ 1,
+               #         vaccine == 1 & vaccine_mix ==1 ~ 3,
+               #         vaccine == 2 & vaccine_mix ==0 ~ 2,
+               #         vaccine == 2 & vaccine_mix ==1 ~ 4,
+               #         TRUE ~ as.numeric(vaccine)
+               # ),
+               vaccine_g = vaccine,
                vaccine_g = as.factor(vaccine_g))
+
+# adjust ----------------------------------------------------------------
 
 res_clog_delta <- clogit(formula = outcome ~ vaccine_g  + strata(age), 
                          data = filter(datafile_cont, lineage == 'Delta')) |> 
@@ -323,6 +329,24 @@ datafile_res_adjust <- rbind(res_clog_delta,
                       res_clog_ba1,
                       res_clog_ba2)
 names(datafile_res_adjust)[2:4] <- c('OR', 'OR_1', 'OR_2')
+
+# unadjust ----------------------------------------------------------------
+
+logit_test <- function(data, indices){
+        data <- data[indices,]
+        model <- glm(formula = outcome ~ vaccine_g, 
+                     data = data,
+                     family = 'binomial')
+        cf <- coef(model)
+        df <- setdiff(colnames(data), names(cf))
+        ad <- rep(0, length(df))
+        names(ad) <- names(df)
+        return(c(cf, ad))
+}
+
+boot_strap <- boot(data = filter(datafile_cont, lineage == 'Delta'),
+                   statistic = logit_test,
+                   R = 1e5)
 
 res_log_delta <- glm(formula = outcome ~ vaccine_g  + factor(age), 
                       data = filter(datafile_cont, lineage == 'Delta'),
