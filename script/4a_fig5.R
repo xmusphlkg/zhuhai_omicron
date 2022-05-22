@@ -7,7 +7,7 @@ library(patchwork)
 library(ggsci)
 library(ggpubr)
 library(survival)
-library(boot)
+library(DMwR)
 
 remove(list = ls())
 
@@ -296,10 +296,19 @@ datafile_cont <- rbind(datafile_cont_Delta,
                #         TRUE ~ as.numeric(vaccine)
                # ),
                vaccine_g = vaccine,
-               vaccine_g = as.factor(vaccine_g))
+               vaccine_g = as.factor(vaccine_g),
+               lineage = factor(lineage, levels = c('Delta', 'BA1', 'BA2')))
 
 # adjust ----------------------------------------------------------------
 
+res_clog <- clogit(formula = outcome ~ lineage + strata(age),
+                   data = datafile_cont) |> 
+     summary() %>%
+     .[["conf.int"]] |> 
+     as.data.frame() |> 
+     mutate(lineage = 'All') |> 
+     select(-`exp(-coef)`) |> 
+     rownames_to_column('var')
 res_clog_delta <- clogit(formula = outcome ~ vaccine_g  + strata(age), 
                          data = filter(datafile_cont, lineage == 'Delta')) |> 
         summary() %>%
@@ -327,61 +336,60 @@ res_clog_ba2 <- clogit(formula = outcome ~ vaccine_g  + strata(age),
 
 datafile_res_adjust <- rbind(res_clog_delta,
                       res_clog_ba1,
-                      res_clog_ba2)
+                      res_clog_ba2,
+                      res_clog)
 names(datafile_res_adjust)[2:4] <- c('OR', 'OR_1', 'OR_2')
 
 # unadjust ----------------------------------------------------------------
 
-logit_test <- function(data, indices){
-        data <- data[indices,]
-        model <- glm(formula = outcome ~ vaccine_g, 
-                     data = data,
-                     family = 'binomial')
-        cf <- coef(model)
-        df <- setdiff(colnames(data), names(cf))
-        ad <- rep(0, length(df))
-        names(ad) <- names(df)
-        return(c(cf, ad))
-}
+datafile_cont_smote <- SMOTE(lineage~., 
+                             data = datafile_cont[,c('lineage', 'vaccine_g', 'outcome')],
+                             perc.over = 600,perc.under=100)
 
-boot_strap <- boot(data = filter(datafile_cont, lineage == 'Delta'),
-                   statistic = logit_test,
-                   R = 1e5)
+res_log <- glm(formula = outcome ~ lineage + vaccine_g,
+               data = datafile_cont_smote,
+               family = binomial(link = "logit")) |>
+     summary() %>%
+     .[["coefficients"]] |>
+     as.data.frame() |>
+     mutate(lineage = 'All') |>
+     rownames_to_column('var')
 
-res_log_delta <- glm(formula = outcome ~ vaccine_g  + factor(age), 
+res_log_delta <- glm(formula = outcome ~ vaccine_g,
                       data = filter(datafile_cont, lineage == 'Delta'),
-                      family = binomial(link = "logit")) |> 
+                      family = binomial(link = "logit")) |>
         summary() %>%
-        .[["coefficients"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'Delta') |> 
+        .[["coefficients"]] |>
+        as.data.frame() |>
+        mutate(lineage = 'Delta') |>
         rownames_to_column('var')
-res_log_ba1 <- glm(formula = outcome ~ vaccine_g  + factor(age), 
+res_log_ba1 <- glm(formula = outcome ~ vaccine_g,
                     data = filter(datafile_cont, lineage == 'BA1'),
-                    family = binomial(link = "logit")) |> 
+                    family = binomial(link = "logit")) |>
         summary() %>%
-        .[["coefficients"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'BA1') |> 
+        .[["coefficients"]] |>
+        as.data.frame() |>
+        mutate(lineage = 'BA1') |>
         rownames_to_column('var')
-res_log_ba2 <- glm(formula = outcome ~ vaccine_g  + factor(age), 
+res_log_ba2 <- glm(formula = outcome ~ vaccine_g,
                     data = filter(datafile_cont, lineage == 'BA2'),
-                    family = binomial(link = "logit")) |> 
+                    family = binomial(link = "logit")) |>
         summary() %>%
-        .[["coefficients"]] |> 
-        as.data.frame() |> 
-        mutate(lineage = 'BA2') |> 
+        .[["coefficients"]] |>
+        as.data.frame() |>
+        mutate(lineage = 'BA2') |>
         rownames_to_column('var')
 
 datafile_res_unadjust <- rbind(res_log_delta,
                              res_log_ba1,
-                             res_log_ba2)
-datafile_res_unadjust <- datafile_res_unadjust[-grep('age|Intercept', datafile_res_unadjust$var),] |> 
-        select(var, lineage, Estimate, `Std. Error`) |> 
-        mutate(OR = exp(Estimate),
-               OR_1 = exp(Estimate - 1.96*`Std. Error`),
-               OR_2 = exp(Estimate + 1.96*`Std. Error`)) |> 
-        select(var, OR, OR_1, OR_2, lineage)
+                             res_log_ba2,
+                             res_log)
+datafile_res_unadjust <- datafile_res_unadjust[-grep('_age|Intercept', datafile_res_unadjust$var),] |> 
+     select(var, lineage, Estimate, `Std. Error`) |> 
+     mutate(OR = exp(Estimate),
+            OR_1 = exp(Estimate - 1.96*`Std. Error`),
+            OR_2 = exp(Estimate + 1.96*`Std. Error`)) |> 
+     select(var, OR, OR_1, OR_2, lineage)
 
 # plot --------------------------------------------------------------------
 
@@ -389,10 +397,11 @@ datafile_res_adjust$just <- 'Age'
 datafile_res_unadjust$just <- 'No'
 datafile_res <- rbind(datafile_res_adjust, datafile_res_unadjust) |> 
         mutate(var = factor(var,
-                            levels = c(paste0('vaccine_g', 1:4))),
+                            levels = c(paste0('vaccine_g', 1:4), 'lineageBA1', 'lineageBA2')),
                lineage = factor(lineage,
-                                levels = c('Delta', 'BA1', 'BA2'))) |> 
-        filter(!is.na(OR_1)&OR_1>0)
+                                levels = c('All', 'Delta', 'BA1', 'BA2'))) |> 
+        filter(!is.na(OR_1) & OR_1>0 & OR_2<100) |> 
+     mutate_at(vars(OR, OR_1, OR_2), round, digits = 3)
 
 fig_log_unjust <- ggplot(data = filter(datafile_res, just == 'No'),
                          mapping = aes(x = lineage,
