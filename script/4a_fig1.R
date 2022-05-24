@@ -405,6 +405,6 @@ fig_2 <- fig_map + fig_curve_ba2 + fig_curve_ba1 + fig_curve_delta+
           strip.text = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold')
      )
 
-ggsave(filename = './outcome/publish/Figure 1_r.pdf',
+ggsave(filename = './outcome/publish/Figure 1.pdf',
        fig_2,
        width = 14, height = 15)

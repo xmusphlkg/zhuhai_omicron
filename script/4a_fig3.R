@@ -129,7 +129,7 @@ datafile_cont_Delta$lineage <- 'Delta'
 
 datafile_cont <- rbind(datafile_cont_Delta,
                        datafile_cont_BA1,
-                       mutate(datafile_cont_BA2, gender = NA))|> 
+                       datafile_cont_BA2)|> 
      select(age, vaccine, vaccine_mix, lineage) |> 
      mutate(age_g = if_else(age <=18, 'c', 'a'),
             age_g = if_else(age >=65, 'o', age_g),

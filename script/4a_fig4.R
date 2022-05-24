@@ -107,20 +107,18 @@ diff_dis <- function(shape1, rate1, shape2, rate2, n){
 
 # fit incubation time -----------------------------------------------------
 
-datafile_info <- datafile_info_BA1 %>% 
-     dplyr::select(dateonset, dateexpose1, dateexpose2, type) %>% 
+datafile_BA1_ib <- datafile_info_BA1 %>% 
+     dplyr::select(id, dateonset, dateexpose1, dateexpose2, type) %>% 
      mutate(date_seq_1 = dateonset - dateexpose1,
             date_seq_2 = dateonset - dateexpose2) %>% 
      filter(type != 'Asymptomatic')
 
-datafile_info$expose_date <- mapply(expose_date, datafile_info$dateexpose1, datafile_info$dateexpose2)
+datafile_BA1_ib$expose_date <- mapply(expose_date, datafile_BA1_ib$dateexpose1, datafile_BA1_ib$dateexpose2)
 
-ib_ba1 <- fit_gamma_incubation_dist(datafile_info, 
+ib_ba1 <- fit_gamma_incubation_dist(datafile_BA1_ib, 
                                     dateonset, 
                                     dateexpose1,
                                     dateexpose2)
-
-# ib_out <- capture.output(ib)
 
 datafile_BA2_ib <- datafile_info_BA2 %>% 
      dplyr::select(id, dateonset, dateexpose1, dateexpose2, type) %>% 
