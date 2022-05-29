@@ -317,7 +317,7 @@ fig_2 <- ggplot(data = datafile_cout_sum)+
         scale_x_discrete(labels = c('Unfully Vaccinated', 'Fully Vaccinated', 'Booster Dose'),
                          expand = c(0, 0.6),
                          breaks = c('C', 'B', 'A'))+
-        scale_y_continuous(limits = c(0, 2500),
+        scale_y_continuous(limits = c(0, 2000),
                            expand = c(0, 0))+
         scale_fill_manual(values = fill_color_1,
                           labels = c('Sinopharm',
@@ -339,7 +339,7 @@ fig_2 <- ggplot(data = datafile_cout_sum)+
               panel.grid.major = element_blank(),
               panel.grid.minor = element_blank(),
               legend.position = 'bottom')+
-        labs(y = "Contacts",
+        labs(y = "Number of contacts",
              x = '',
              fill = 'Manufacturer')
 

@@ -99,11 +99,11 @@ fit_best <- function(data, distribution.type = NULL){
      }
 }
 
-diff_dis <- function(shape1, rate1, shape2, rate2, n){
-     a <- sort(rgamma(n, shape1, rate1))
-     b <- sort(rgamma(n, shape2, rate2))
-     return(a - b)
-}
+# diff_dis <- function(shape1, rate1, shape2, rate2, n){
+#      a <- rgamma(n, shape1, rate1)
+#      b <- rgamma(n, shape2, rate2)
+#      return(a - b)
+# }
 
 # fit incubation time -----------------------------------------------------
 
@@ -210,6 +210,86 @@ si_ba2 <- fit_best(data = as.numeric(datafile_cont_2$date_sep),
 
 si_delta <- fit_best(data = as.numeric(datafile_cont_3$date_sep), 
                      distribution.type = 'gamma')
+
+# estimate differ ---------------------------------------------------------
+
+datafile_ib <- datafile_BA1_ib |> dplyr::select(id, date_seq_1, date_seq_2)
+datafile_ib$ib <- mapply(seq, from = datafile_ib$date_seq_2, to = datafile_ib$date_seq_1)
+datafile_ib <- datafile_ib |> 
+        mutate(freq = 1/n()) |> 
+        unnest(cols = ib) |> 
+        group_by(id) |> 
+        mutate(freq = freq/n()) |> 
+        dplyr::select(id, ib, freq)
+
+datafile_si <- datafile_cont_1 |> 
+        dplyr::select(infectee, date_sep) |> 
+        group_by(infectee) |> 
+        summarise(si = median(date_sep),
+                  .groups = 'drop') |> 
+        rename(id = 'infectee')
+
+datafile_differ_BA1 <- datafile_ib |> 
+        left_join(datafile_si) |> 
+        mutate(diff = round(si - ib)) |> 
+        ungroup() |> 
+        filter(!is.na(diff)) |> 
+        mutate(freq = as.numeric(freq/sum(freq))) |> 
+        group_by(diff) |> 
+        summarise(freq = sum(freq),
+                  .groups = 'drop')
+
+datafile_ib <- datafile_BA2_ib |> dplyr::select(id, date_seq_1, date_seq_2)
+datafile_ib$ib <- mapply(seq, from = datafile_ib$date_seq_2, to = datafile_ib$date_seq_1)
+datafile_ib <- datafile_ib |> 
+        mutate(freq = 1/n()) |> 
+        unnest(cols = ib) |> 
+        group_by(id) |> 
+        mutate(freq = freq/n()) |> 
+        dplyr::select(id, ib, freq)
+
+datafile_si <- datafile_cont_2 |> 
+        dplyr::select(infectee, date_sep) |> 
+        group_by(infectee) |> 
+        summarise(si = median(date_sep),
+                  .groups = 'drop') |> 
+        rename(id = 'infectee')
+
+datafile_differ_BA2 <- datafile_ib |> 
+        left_join(datafile_si) |> 
+        mutate(diff = round(si - ib)) |> 
+        ungroup() |> 
+        filter(!is.na(diff)) |> 
+        mutate(freq = as.numeric(freq/sum(freq))) |> 
+        group_by(diff) |> 
+        summarise(freq = sum(freq),
+                  .groups = 'drop')
+
+datafile_ib <- datafile_Delta_ib |> dplyr::select(id, date_seq_1, date_seq_2)
+datafile_ib$ib <- mapply(seq, from = datafile_ib$date_seq_2, to = datafile_ib$date_seq_1)
+datafile_ib <- datafile_ib |> 
+        mutate(freq = 1/n()) |> 
+        unnest(cols = ib) |> 
+        group_by(id) |> 
+        mutate(freq = freq/n()) |> 
+        dplyr::select(id, ib, freq)
+
+datafile_si <- datafile_cont_3 |> 
+        dplyr::select(infectee, date_sep) |> 
+        group_by(infectee) |> 
+        summarise(si = median(date_sep),
+                  .groups = 'drop') |> 
+        rename(id = 'infectee')
+
+datafile_differ_Delta <- datafile_ib |> 
+        left_join(datafile_si) |> 
+        mutate(diff = round(si - ib)) |> 
+        ungroup() |> 
+        filter(!is.na(diff)) |> 
+        mutate(freq = as.numeric(freq/sum(freq))) |> 
+        group_by(diff) |> 
+        summarise(freq = sum(freq),
+                  .groups = 'drop')
 
 # estimate R0 -------------------------------------------------------------
 
@@ -695,34 +775,45 @@ fig_gt <- fig_gt +
 
 ## plot differ -----------------------------------------------------------
 
-diff_delta <- diff_dis(si_delta$shape,si_delta$rate,
-                       ib_delta$distribution$parameters$shape,
-                       1 / ib_delta$distribution$parameters$scale,
-                       100000)
-diff_ba1 <- diff_dis(si_ba1$shape,si_ba1$rate,
-                     ib_ba1$distribution$parameters$shape,
-                     1 / ib_ba1$distribution$parameters$scale,
-                     100000)
-diff_ba2 <- diff_dis(si_ba2$shape,si_ba2$rate,
-                     ib_ba2$distribution$parameters$shape,
-                     1 / ib_ba2$distribution$parameters$scale,
-                     100000)
+# diff_delta <- diff_dis(si_delta$shape,si_delta$rate,
+#                        ib_delta$distribution$parameters$shape,
+#                        1 / ib_delta$distribution$parameters$scale,
+#                        100000)
+# diff_ba1 <- diff_dis(si_ba1$shape,si_ba1$rate,
+#                      ib_ba1$distribution$parameters$shape,
+#                      1 / ib_ba1$distribution$parameters$scale,
+#                      100000)
+# diff_ba2 <- diff_dis(si_ba2$shape,
+#                      si_ba2$rate,
+#                      ib_ba2$distribution$parameters$shape,
+#                      1 / ib_ba2$distribution$parameters$scale,
+#                      100000)
 
-datafile <- data.frame(
-     variant = rep(c('Delta', 'BA.1', 'BA.2'),
-                   each = 100000),
-     mean = c(diff_delta, diff_ba1, diff_ba2))
-datafile$variant <- factor(datafile$variant,
+datafile_differ_BA1$lineage <- 'BA.1'
+datafile_differ_BA2$lineage <- 'BA.2'
+datafile_differ_Delta$lineage <- 'Delta'
+
+datafile <- rbind(datafile_differ_BA1,
+                  datafile_differ_BA2,
+                  datafile_differ_Delta)
+datafile$lineage <- factor(datafile$lineage,
                            levels = c('Delta', 'BA.1', 'BA.2'))
+datafile$diff <- as.numeric(datafile$diff)
 
 fig_diff <- ggplot(datafile)+
-     geom_boxplot(mapping = aes(x = mean,
-                                y = variant),
-                  fill = fill_color)+
+     geom_col(mapping = aes(x = diff,
+                            y = freq,
+                            fill = lineage),
+              color = 'white',
+              position = position_dodge2(width = 1, preserve = "single"),
+              show.legend = T)+
+     scale_fill_manual(values = fill_color)+
      scale_x_continuous(expand = c(0, 0),
-                        limits = c(-5, 10))+
+                        limits = c(-12, 6))+
+     scale_y_continuous(expand = c(0, 0),
+                        limits = c(0, 0.4))+
      annotate(geom = 'text',
-              x = 2.5,
+              x = -3,
               y = Inf,
               vjust = -0.7,
               size = 11*5/14,
