@@ -932,5 +932,5 @@ datafile_table <- datafile_table |>
      mutate_if(is.numeric, round, digits = 2)
 
 write.csv(datafile_table,
-          file = './outcome/publish/Table 3.csv',
+          file = './outcome/base/Table 3.csv',
           row.names = F)

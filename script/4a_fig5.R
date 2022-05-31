@@ -457,7 +457,7 @@ datafile_res <- rbind(datafile_res_adjust, datafile_res_unadjust) |>
                lineage = factor(lineage,
                                 levels = c('Delta', 'BA1', 'BA2'))) |> 
         filter(!is.na(OR_1) & OR_1>0 & OR_2<100) |> 
-     mutate_at(vars(OR, OR_1, OR_2), round, digits = 3)
+     mutate_at(vars(OR, OR_1, OR_2), round, digits = 4)
 
 fig_log_unjust <- ggplot(data = filter(datafile_res, just == 'No'),
                          mapping = aes(x = lineage,
