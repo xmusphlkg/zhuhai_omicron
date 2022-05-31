@@ -341,12 +341,11 @@ fig_net_ba1 <- fig_net_ba1 +
 fig <- graph_from_data_frame(d = datafile_chains_Delta[,c('from', 'to')],
                              vertices = mutate(datafile_info_Delta,
                                                label = id,
-                                               
                                                type = factor(type, 
                                                              levels = type_levels,
                                                              labels = LETTERS[1:4]),
-                                               width = factor(vaccine, levels = c(3, 2, 1, 0),
-                                                              labels = c('A', 'B', 'C', 'C'))),
+                                               width = factor(vaccine, levels = c(2, 1, 0),
+                                                              labels = c('B', 'C', 'C'))),
                              directed = T)
 
 fig_net_delta <- ggraph(fig,layout = "kk")+
@@ -368,8 +367,8 @@ fig_net_delta <- ggraph(fig,layout = "kk")+
                        labels = type_levels,
                        values = fill_color)+
      scale_linetype_manual(name = 'Vaccination status',
-                           labels = c('Booster Dose', 'Fully Vaccinated', 'Unfully Vaccinated'),
-                           values = c('solid', 'longdash', 'dotted'))+
+                           labels = c('Fully Vaccinated', 'Unfully Vaccinated'),
+                           values = c('longdash', 'dotted'))+
      theme_graph(base_family = 'Helvetica')+
      coord_cartesian(clip = "off")+
      labs(title = 'g')
@@ -405,6 +404,6 @@ fig_2 <- fig_map + fig_curve_ba2 + fig_curve_ba1 + fig_curve_delta+
           strip.text = element_text(size = 12, hjust = .5, vjust = 0, face = 'bold')
      )
 
-ggsave(filename = './outcome/publish/Figure 1.pdf',
+ggsave(filename = './outcome/publish/Figure 1r.pdf',
        fig_2,
        width = 14, height = 15)

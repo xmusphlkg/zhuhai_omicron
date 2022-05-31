@@ -503,10 +503,19 @@ fill_color <- rev(ggsci::pal_nejm()(4))[-3]
 ## plot ib -----------------------------------------------------------------
 
 datafile <- data.frame(
+     parameter = 'Incubation Period',
      variant = c('Delta', 'BA.1', 'BA.2'),
      mean = c(ib_delta$mu, ib_ba1$mu, ib_ba2$mu),
-     sd = c(ib_delta$sd, ib_ba1$sd, ib_ba2$sd)
+     sd = c(ib_delta$sd, ib_ba1$sd, ib_ba2$sd),
+     shape = c(ib_delta$distribution$parameters$shape,
+               ib_ba1$distribution$parameters$shape,
+               ib_ba2$distribution$parameters$shape),
+     rate = 1/c(ib_delta$distribution$parameters$scale,
+               ib_ba1$distribution$parameters$scale,
+               ib_ba2$distribution$parameters$scale)
 )
+
+datafile_table <- datafile
 
 fig_ib_inside <- ggplot(data = datafile,
                         mapping = aes(x = variant,
@@ -561,7 +570,7 @@ fig_ib <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      labs(x = '',
           y = 'Relative frequency',
           colour = '',
-          title = 'a')+
+          title = 'b')+
      guides(color = 'none')
 
 fig_ib <- fig_ib + inset_element(fig_ib_inside, 0.4, 0.2, 1, 1)
@@ -569,10 +578,19 @@ fig_ib <- fig_ib + inset_element(fig_ib_inside, 0.4, 0.2, 1, 1)
 ## plot si -----------------------------------------------------------------
 
 datafile <- data.frame(
+     parameter = 'Serial interval',
      variant = c('Delta', 'BA.1', 'BA.2'),
      mean = c(si_delta$mean, si_ba1$mean, si_ba2$mean),
-     sd = c(si_delta$sd, si_ba1$sd, si_ba2$sd)
+     sd = c(si_delta$sd, si_ba1$sd, si_ba2$sd),
+     shape = c(si_delta$shape,
+               si_ba1$shape,
+               si_ba2$shape),
+     rate = c(si_delta$rate,
+               si_ba1$rate,
+               si_ba2$rate)
 )
+
+datafile_table <- rbind(datafile, datafile_table)
 
 fig_si_inside <- ggplot(data = datafile,
                         mapping = aes(x = variant,
@@ -626,7 +644,7 @@ fig_si <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      labs(x = 'Time (days)',
           y = 'Relative frequency',
           colour = 'Variants',
-          title = 'c')+
+          title = 'a')+
      theme_classic(base_family = 'Helvetica')+
      theme(legend.position = 'bottom')+ 
      guides(color = 'none')
@@ -637,12 +655,15 @@ fig_si <- fig_si +
 ## plot tg -----------------------------------------------------------------
 
 datafile <- data.frame(
+     parameter = 'Transmission generation',
      variant = c('Delta', 'BA.1', 'BA.2'),
      shape = c(tg_delta$shape, tg_ba1$shape, tg_ba2$shape),
      rate = c(tg_delta$rate, tg_ba1$rate, tg_ba2$rate)
 ) |> 
      mutate(mean = shape/rate,
             sd = sqrt(shape)/rate)
+
+datafile_table <- rbind(datafile, datafile_table)
 
 fig_tg_inside <- ggplot(data = datafile,
                         mapping = aes(x = variant,
@@ -697,7 +718,7 @@ fig_tg <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      labs(x = 'Time (days)',
           y = '',
           colour = '',
-          title = 'd')+
+          title = 'e')+
      guides(color = 'none')
 
 fig_tg <- fig_tg + 
@@ -706,12 +727,15 @@ fig_tg <- fig_tg +
 ## plot gt -----------------------------------------------------------------
 
 datafile <- data.frame(
+     parameter = 'Generation time',
      variant = c('Delta', 'BA.1', 'BA.2'),
      shape = c(gt_delta$shape, gt_ba1$shape, gt_ba2$shape),
      rate = c(gt_delta$rate, gt_ba1$rate, gt_ba2$rate)
 ) |> 
      mutate(mean = shape/rate,
             sd = sqrt(shape)/rate)
+
+datafile_table <- rbind(datafile, datafile_table)
 
 fig_gt_inside <- ggplot(data = datafile,
                         mapping = aes(x = variant,
@@ -766,7 +790,7 @@ fig_gt <- ggplot(data = data.frame(x = c(0, 15)), aes(x)) +
      labs(x = '',
           y = '',
           colour = '',
-          title = 'b')+
+          title = 'd')+
      guides(color = 'none')
 
 fig_gt <- fig_gt + 
@@ -795,10 +819,14 @@ datafile_differ_Delta$lineage <- 'Delta'
 
 datafile <- rbind(datafile_differ_BA1,
                   datafile_differ_BA2,
-                  datafile_differ_Delta)
-datafile$lineage <- factor(datafile$lineage,
-                           levels = c('Delta', 'BA.1', 'BA.2'))
-datafile$diff <- as.numeric(datafile$diff)
+                  datafile_differ_Delta) |> 
+        group_by(lineage) |> 
+        mutate(lineage = factor(lineage,
+                                levels = c('Delta', 'BA.1', 'BA.2')),
+               diff = as.numeric(diff),
+               cfreq = cumsum(freq))
+
+
 
 fig_diff <- ggplot(datafile)+
      geom_col(mapping = aes(x = diff,
@@ -822,9 +850,9 @@ fig_diff <- ggplot(datafile)+
      coord_cartesian(clip = "off")+
      theme_classic(base_family = 'Helvetica')+
      labs(x = 'Time (days)',
-          y = '',
+          y = 'Relative frequency',
           colour = '',
-          title = 'e')+
+          title = 'c')+
      guides(fill = 'none')
 
 # plot Reff ---------------------------------------------------------------
@@ -878,8 +906,8 @@ fig_reff <- ggplot(data = datafile,
 
 # multiplot ---------------------------------------------------------------
 
-fig <- fig_ib + fig_gt + fig_si + fig_tg + fig_diff + fig_reff+
-     plot_layout(ncol = 2, byrow = T) &
+fig <- fig_si + fig_ib + fig_diff + fig_gt + fig_tg + fig_reff+
+     plot_layout(ncol = 2, byrow = F) &
      theme(axis.text.x = element_text(size = 10, hjust = 0.5, vjust = 0.5, face = 'plain', color = 'black'),
            axis.text.y = element_text(size = 10, hjust = 1, vjust = .5, face = 'plain', color = 'black'),
            axis.title.x = element_text(size = 12, hjust = .5, vjust = .5, face = 'bold'),
@@ -897,3 +925,12 @@ fig
 
 ggsave(filename = './outcome/publish/Figure 4.pdf', 
        height = 7, width = 7)
+
+# write table -------------------------------------------------------------
+
+datafile_table <- datafile_table |> 
+     mutate_if(is.numeric, round, digits = 2)
+
+write.csv(datafile_table,
+          file = './outcome/publish/Table 3.csv',
+          row.names = F)
