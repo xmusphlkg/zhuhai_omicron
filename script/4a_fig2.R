@@ -36,8 +36,9 @@ datafile_gannt_plot <- datafile_gannt[rep(datafile_gannt$id, 4), c('id', 'index'
      group_by(index) |> 
      mutate(index = fct_inorder(index))
 
-y_labels <- paste('Case', datafile_gannt$index)
+y_labels <- paste('Infection', datafile_gannt$index)
 names(y_labels) <- as.character(datafile_gannt$index)
+limits <- c(as.Date('2022/3/7'), as.Date('2022/4/10'))
 
 fig_a <- ggplot(data = datafile_gannt_plot)+
      geom_linerange(mapping = aes(y = index,
@@ -55,7 +56,14 @@ fig_a <- ggplot(data = datafile_gannt_plot)+
                               x = end_date,
                               colour = 'E'),
                 size = 6)+
-     # coord_fixed(ratio = 0.95)+
+     annotate(geom = 'text',
+              x = mean.Date(limits),
+              y = Inf,
+              vjust = -0.5,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Infections of Omicron BA.2')+
+     coord_cartesian(clip = "off")+
      scale_colour_manual(values = fill_color_1,
                          labels = c("First Exposed",
                                     "Last Exposed",
@@ -64,7 +72,7 @@ fig_a <- ggplot(data = datafile_gannt_plot)+
                                     "Report"))+
      scale_y_discrete(labels = y_labels)+
      scale_x_date(expand = c(0,1),
-                  limits = c(as.Date('2022/3/7'), as.Date('2022/4/10')),
+                  limits = limits,
                   date_breaks = '2 days',
                   date_labels = '%Y-%m-%d')+
      labs(title = 'a',
@@ -89,8 +97,9 @@ datafile_gannt_plot <- datafile_gannt[rep(datafile_gannt$id, 4), c('id', 'index'
      group_by(index) |> 
      mutate(index = fct_inorder(index))
 
-y_labels <- paste('Case', datafile_gannt$index)
+y_labels <- paste('Infection', datafile_gannt$index)
 names(y_labels) <- as.character(datafile_gannt$index)
+limits <- c(as.Date('2022/1/4'), as.Date('2022/2/7'))
 
 fig_b <- ggplot(data = datafile_gannt_plot)+
      geom_linerange(mapping = aes(y = index,
@@ -108,7 +117,14 @@ fig_b <- ggplot(data = datafile_gannt_plot)+
                               x = end_date,
                               colour = 'E'),
                 size = 6)+
-     # coord_fixed(ratio = 0.95)+
+     annotate(geom = 'text',
+              x = mean.Date(limits),
+              y = Inf,
+              vjust = -0.5,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Infections of Omicron BA.1')+
+     coord_cartesian(clip = "off")+
      scale_colour_manual(values = fill_color_1,
                          labels = c("First Exposed",
                                     "Last Exposed",
@@ -117,7 +133,7 @@ fig_b <- ggplot(data = datafile_gannt_plot)+
                                     "Report"))+
      scale_y_discrete(labels = y_labels)+
      scale_x_date(expand = c(0,1),
-                  limits = c(as.Date('2022/1/4'), as.Date('2022/2/7')),
+                  limits = limits,
                   date_breaks = '2 days',
                   date_labels = '%Y-%m-%d')+
      labs(title = 'b',
@@ -142,8 +158,9 @@ datafile_gannt_plot <- datafile_gannt[rep(datafile_gannt$id, 4), c('id', 'index'
      group_by(index) |> 
      mutate(index = fct_inorder(index))
 
-y_labels <- paste('Case', datafile_gannt$index)
+y_labels <- paste('Infection', datafile_gannt$index)
 names(y_labels) <- as.character(datafile_gannt$index)
+limits <- c(as.Date('2021/7/14'), as.Date('2021/8/17'))
 
 fig_c <- ggplot(data = datafile_gannt_plot)+
      geom_linerange(mapping = aes(y = index,
@@ -161,7 +178,14 @@ fig_c <- ggplot(data = datafile_gannt_plot)+
                               x = end_date,
                               colour = 'E'),
                 size = 6)+
-     # coord_fixed(ratio = 0.95)+
+     annotate(geom = 'text',
+              x = mean.Date(limits),
+              y = Inf,
+              vjust = -0.5,
+              size = 11*5/14,
+              family = 'Helvetica',
+              label = 'Infections of Delta')+
+     coord_cartesian(clip = "off")+
      scale_colour_manual(values = fill_color_1,
                          labels = c("First Exposed",
                                     "Last Exposed",
@@ -170,7 +194,7 @@ fig_c <- ggplot(data = datafile_gannt_plot)+
                                     "Report"))+
      scale_y_discrete(labels = y_labels)+
      scale_x_date(expand = c(0,1),
-                  limits = c(as.Date('2021/7/14'), as.Date('2021/8/17')),
+                  limits = limits,
                   date_breaks = '2 days',
                   date_labels = '%Y-%m-%d')+
      labs(title = 'c',
