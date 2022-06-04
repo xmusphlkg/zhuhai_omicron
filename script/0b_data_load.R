@@ -52,3 +52,5 @@ datafile_info_Delta <- datafile_info_Delta |>
 
 
 save.image('./data/sars_2_cov.Rdata')
+
+datafile_cont_Delta$gender[!datafile_cont_Delta$gender %in% c('Male', 'Female')] <- ''

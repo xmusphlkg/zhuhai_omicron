@@ -791,3 +791,7 @@ fig_a + fig_b +fig_c + fig_d + fig_e + fig_f + fig_g + fig_h + fig_i + fig_j + f
 
 ggsave(filename = './outcome/publish/extend/Figure S2.pdf', 
        height = 8, width = 12)
+
+ggsave(filename = './outcome/publish/extend/Figure S2.tiff', 
+       height = 8, width = 12)
+

@@ -922,3 +922,6 @@ fig
 
 ggsave(filename = './outcome/publish/extend/Figure S1.pdf', 
        height = 8, width = 12)
+
+ggsave(filename = './outcome/publish/extend/Figure S1.tiff', 
+       height = 8, width = 12)

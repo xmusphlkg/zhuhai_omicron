@@ -78,7 +78,7 @@ fig_a <- ggplot(data = datafile_info,
         labs(x = 'Time from onset to testing (days)',
              y = 'Probability density functions',
              color = 'VOC',
-             title = 'a')
+             title = '')
 
 # ggplot(data = datafile_info,
 #        mapping = aes(x = onset_positive,
@@ -87,5 +87,11 @@ fig_a <- ggplot(data = datafile_info,
 #      geom_point()+
 #      geom_smooth(method = 'glm')
 
+fig_a
+
 ggsave(filename = './outcome/publish/extend/Figure S3.pdf', 
+       height = 3.5, width = 3.5)
+
+ggsave(filename = './outcome/publish/extend/Figure S3.tiff', 
+       fig_a,
        height = 3.5, width = 3.5)
