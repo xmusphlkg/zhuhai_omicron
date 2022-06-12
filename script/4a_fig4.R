@@ -1,6 +1,7 @@
 
 # packages ----------------------------------------------------------------
-
+# devtools::install_github("reconhub/epitrix")
+# devtools::install_github('tobadia/R0')
 library(tidyverse)
 library(patchwork)
 library(scales)
@@ -21,6 +22,7 @@ set.seed(202202)
 # function ----------------------------------------------------------------
 
 library(epitrix)
+library(MASS)
 
 expose_date <- function(a, b){
      return(as.Date(seq.Date(a, b, by = 'day')))
