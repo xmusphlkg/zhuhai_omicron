@@ -357,26 +357,26 @@ datafile_cont <- rbind(datafile_cont_Delta,
 
 # datafile_resample_delta <- SMOTE(vaccine_g~.,
 #                                  data = filter(datafile_cont, lineage == 'Delta'))
-datafile_resample_delta <- filter(datafile_cont, lineage == 'Delta')
-
-datafile_resample_ba1 <- SMOTE(vaccine_g~.,
-                               data = filter(datafile_cont, lineage == 'BA1'),
-                               perc.over = 600,perc.under=100)
-
-datafile_resample_ba2 <- SMOTE(vaccine_g~.,
-                               data = filter(datafile_cont, lineage == 'BA2'),
-                               perc.over = 600,perc.under=100)
-
-datafile_resample <- rbind(datafile_resample_delta,
-                           datafile_resample_ba1,
-                           datafile_resample_ba2)
-
-# datafile_resample <- SMOTE(vaccine_g ~ .,
-#                            data = datafile_cont)
-
-table(datafile_resample$lineage)
-
-datafile_cont <- datafile_resample
+# datafile_resample_delta <- filter(datafile_cont, lineage == 'Delta')
+# 
+# datafile_resample_ba1 <- SMOTE(vaccine_g~.,
+#                                data = filter(datafile_cont, lineage == 'BA1'),
+#                                perc.over = 600,perc.under=100)
+# 
+# datafile_resample_ba2 <- SMOTE(vaccine_g~.,
+#                                data = filter(datafile_cont, lineage == 'BA2'),
+#                                perc.over = 600,perc.under=100)
+# 
+# datafile_resample <- rbind(datafile_resample_delta,
+#                            datafile_resample_ba1,
+#                            datafile_resample_ba2)
+# 
+# # datafile_resample <- SMOTE(vaccine_g ~ .,
+# #                            data = datafile_cont)
+# 
+# table(datafile_resample$lineage)
+# 
+# datafile_cont <- datafile_resample
 datafile_cont$outcome <- as.numeric(datafile_cont$outcome) - 1
 
 # adjust ----------------------------------------------------------------
@@ -475,8 +475,8 @@ fig_log_unjust <- ggplot(data = filter(datafile_res, just == 'No'),
                    labeller = as_labeller(c('vaccine_g1' = 'Fully vaccinated vs.\nUnfully vaccinated',
                                             'vaccine_g2' = 'Booster dose vs.\nUnfully vaccinated')))+
         scale_x_discrete(expand = c(0, 0.6))+
-        scale_y_continuous(limits = c(0, 4),
-                           breaks = seq(0, 4, 1),
+        scale_y_continuous(limits = c(0, 5),
+                           breaks = seq(0, 5, 1),
                            expand = c(0, 0))+
         scale_color_manual(values = fill_color,
                            labels = c('Delta', 'BA.1', 'BA.2'),
@@ -505,8 +505,8 @@ fig_log_just <- ggplot(data = filter(datafile_res, just == 'Age'),
                    labeller = as_labeller(c('vaccine_g1' = 'Fully vaccinated vs.\nUnfully vaccinated',
                                             'vaccine_g2' = 'Booster dose vs.\nUnfully vaccinated')))+
         scale_x_discrete(expand = c(0, 0.6))+
-        scale_y_continuous(limits = c(0, 4),
-                           breaks = seq(0, 4, 1),
+        scale_y_continuous(limits = c(0, 5),
+                           breaks = seq(0, 5, 1),
                            expand = c(0, 0))+
         scale_color_manual(values = fill_color,
                            labels = c('Delta', 'BA.1', 'BA.2'),
